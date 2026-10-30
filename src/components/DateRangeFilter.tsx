@@ -111,9 +111,9 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
   ];
 
   return (
-    <div className={`flex flex-col sm:flex-row items-start sm:items-center gap-2.5 ${className}`}>
+    <div className={`flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 max-w-full ${className}`}>
       {/* Preset Pill Buttons */}
-      <div className="flex items-center gap-1 bg-white p-1 rounded-2xl border border-slate-200/80 shadow-2xs">
+      <div className="flex items-center gap-1 bg-white p-1 rounded-2xl border border-slate-200/80 shadow-2xs overflow-x-auto max-w-full">
         {presets.map((p) => {
           const isActive = preset === p.id;
           return (
@@ -121,7 +121,7 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
               key={p.id}
               type="button"
               onClick={() => handleSelectPreset(p.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-150 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150 ${
                 isActive
                   ? 'bg-blue-600 text-white shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
@@ -135,7 +135,7 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
 
       {/* Custom Date Pickers (Shown when 'custom' is selected) */}
       {preset === 'custom' && (
-        <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-2xl border border-slate-200/80 shadow-2xs animate-fadeIn text-xs">
+        <div className="flex flex-wrap items-center gap-2 bg-white px-3 py-2 rounded-2xl border border-slate-200/80 shadow-2xs animate-fadeIn text-xs w-full sm:w-auto">
           <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
           <input
             type="date"
@@ -153,7 +153,7 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
           <button
             type="button"
             onClick={handleCustomApply}
-            className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-2xs"
+            className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-2xs ml-auto sm:ml-0"
           >
             Apply
           </button>

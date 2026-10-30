@@ -101,39 +101,39 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-7 overflow-y-auto h-full">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 sm:space-y-7">
       {/* Header & Quick Workflow Actions */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/80 pb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/80 pb-5">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-[#1D1D1F]">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1D1D1F]">
             Distribution Fleet Dashboard
           </h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <p className="text-slate-500 text-xs sm:text-sm mt-1">
             Real-time status of 3 delivery lorries, route sales, and warehouse stock flow.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
           <button
             onClick={onNavigateToLoading}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-2xl shadow-sm transition text-xs"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-2xl shadow-sm transition text-xs"
           >
             <Truck className="w-4 h-4" />
-            Morning Lorry Load
+            <span className="truncate">Morning Load</span>
           </button>
           <button
             onClick={onNavigateToBillEntry}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-black text-white font-semibold rounded-2xl shadow-sm transition text-xs"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-slate-900 hover:bg-black text-white font-semibold rounded-2xl shadow-sm transition text-xs"
           >
             <Receipt className="w-4 h-4" />
-            Enter Driver Bills
+            <span className="truncate">Enter Bills</span>
           </button>
           <button
             onClick={onNavigateToSettlement}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 font-semibold rounded-2xl shadow-2xs transition text-xs"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 font-semibold rounded-2xl shadow-2xs transition text-xs"
           >
             <RotateCcw className="w-4 h-4 text-emerald-600" />
-            Day Settlement
+            <span className="truncate">Settlement</span>
           </button>
         </div>
       </div>

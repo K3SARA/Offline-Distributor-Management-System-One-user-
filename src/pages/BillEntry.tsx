@@ -185,76 +185,76 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#F1F3F6] p-8 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-5 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-blue-600 mb-1">
             <Receipt className="w-4 h-4" />
             <span>Step 3: Evening Office Bill Entry</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
             Driver Sales Bill Entry
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
             Office manager inputs paper receipts brought back by drivers. Deducts from lorry floating stock.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 text-xs font-medium bg-white px-3.5 py-2 rounded-2xl border border-slate-200/80 shadow-2xs">
+        <div className="self-start sm:self-auto flex items-center gap-2 text-xs font-medium bg-white px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl border border-slate-200/80 shadow-2xs">
           <Calendar className="w-4 h-4 text-slate-400" />
           <span className="text-slate-600 font-medium">
-            Evening Session: {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            Evening: {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </span>
         </div>
       </div>
 
       {/* Notifications */}
       {successMessage && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-800 text-sm font-medium animate-fadeIn">
+        <div className="p-3.5 sm:p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-800 text-xs sm:text-sm font-medium animate-fadeIn">
           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
           <span>{successMessage}</span>
         </div>
       )}
 
       {errorMessage && (
-        <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3 text-rose-800 text-sm font-medium animate-fadeIn">
+        <div className="p-3.5 sm:p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3 text-rose-800 text-xs sm:text-sm font-medium animate-fadeIn">
           <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
           <span>{errorMessage}</span>
         </div>
       )}
 
       {/* Lorry Selector Bar */}
-      <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
             <Truck className="w-5 h-5" />
           </div>
           <div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
               Active Driver Lorry
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-sm font-bold text-slate-900">{selectedLorry?.vehicleNumber}</span>
               <span className="text-xs text-slate-500">• {selectedLorry?.driverName}</span>
-              <span className="text-xs text-blue-600 font-medium">({selectedLorry?.route?.name})</span>
+              <span className="text-xs text-blue-600 font-medium truncate">({selectedLorry?.route?.name})</span>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0">
           {lorries.map((lorry) => {
             const isSelected = lorry.id === selectedLorryId;
             return (
               <button
                 key={lorry.id}
                 onClick={() => setSelectedLorryId(lorry.id)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${isSelected
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex-1 sm:flex-initial text-center ${isSelected
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
               >
-                {lorry.vehicleNumber} ({lorry.driverName.split(' ')[0]})
+                {lorry.vehicleNumber}
               </button>
             );
           })}

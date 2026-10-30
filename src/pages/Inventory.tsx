@@ -74,18 +74,18 @@ export const Inventory: React.FC = () => {
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 overflow-y-auto h-full">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6 overflow-y-auto h-full pb-24 md:pb-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/80 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-slate-200/80 pb-4 sm:pb-6">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-blue-600 mb-1">
             <Boxes className="w-4 h-4" />
             <span>Step 1: Central Warehouse Bulk Inward</span>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-[#1D1D1F]">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1D1D1F]">
             Central Warehouse Stock
           </h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <p className="text-slate-500 text-xs sm:text-sm mt-0.5 sm:mt-1">
             Bulk stock inward from suppliers. Items here will be loaded into the 3 lorries every morning.
           </p>
         </div>
@@ -93,7 +93,7 @@ export const Inventory: React.FC = () => {
         <div className="flex items-center gap-3">
           <button
             onClick={openAddModal}
-            className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-[#0071E3] hover:bg-blue-600 active:scale-[0.98] text-white font-semibold rounded-2xl shadow-sm transition text-xs"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 bg-[#0071E3] hover:bg-blue-600 active:scale-[0.98] text-white font-semibold rounded-2xl shadow-sm transition text-xs"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
             Add New Product
@@ -102,37 +102,37 @@ export const Inventory: React.FC = () => {
       </div>
 
       {/* Controls Bar: Search & Low Stock Toggle */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-3xl border border-slate-200/80 shadow-2xs">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs">
         <div className="relative w-full sm:w-96">
           <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
           <input
             type="text"
-            placeholder="Search by SKU, product name, or category..."
+            placeholder="Search SKU, product name..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#0071E3] font-medium"
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#0071E3] font-medium"
           />
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
           <button
             onClick={() => setLowStockOnly(!lowStockOnly)}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 border transition ${
+            className={`w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 border transition ${
               lowStockOnly
                 ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
                 : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
           >
             <AlertTriangle className="w-3.5 h-3.5" />
-            {lowStockOnly ? 'Showing Low Stock Only' : 'Filter Low Stock Alert'}
+            {lowStockOnly ? 'Low Stock Only' : 'Filter Low Stock Alert'}
           </button>
         </div>
       </div>
 
       {/* Products Table */}
-      <div className="bg-white border border-slate-200/70 rounded-3xl shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
+      <div className="bg-white border border-slate-200/70 rounded-2xl sm:rounded-3xl shadow-2xs overflow-hidden">
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+          <table className="w-full text-left border-collapse text-xs min-w-[680px]">
             <thead>
               <tr className="bg-slate-50/80 text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-100">
                 <th className="px-7 py-4">SKU</th>

@@ -116,10 +116,10 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden">
-        <div className="px-7 py-5 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-slate-900">
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden">
+        <div className="px-5 sm:px-7 py-4 sm:py-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+          <h3 className="text-base sm:text-lg font-semibold text-slate-900">
             {customer ? 'Edit Client Profile' : 'Register New Retail Client'}
           </h3>
           <button
@@ -131,12 +131,12 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
         </div>
 
         {error && (
-          <div className="bg-rose-50 text-rose-700 text-xs px-7 py-2.5 font-medium border-b border-rose-100">
+          <div className="bg-rose-50 text-rose-700 text-xs px-5 sm:px-7 py-2.5 font-medium border-b border-rose-100 shrink-0">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="p-7 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 sm:p-7 space-y-3.5 sm:space-y-4 overflow-y-auto">
           <div>
             <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
               Client / Store Name *

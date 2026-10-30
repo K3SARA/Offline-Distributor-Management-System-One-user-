@@ -53,11 +53,11 @@ export const StockAdjustModal: React.FC<StockAdjustModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden">
-        <div className="px-7 py-5 border-b border-slate-100 flex items-center justify-between">
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl max-w-md w-full max-h-[92vh] flex flex-col overflow-hidden">
+        <div className="px-5 sm:px-7 py-4 sm:py-5 border-b border-slate-100 flex items-center justify-between shrink-0">
           <div>
-            <h3 className="text-lg font-semibold text-slate-900">Receive Stock / Adjust</h3>
+            <h3 className="text-base sm:text-lg font-semibold text-slate-900">Receive Stock / Adjust</h3>
             <p className="text-xs text-slate-400 mt-0.5">{product.name} ({product.sku})</p>
           </div>
           <button
@@ -69,12 +69,12 @@ export const StockAdjustModal: React.FC<StockAdjustModalProps> = ({
         </div>
 
         {error && (
-          <div className="bg-rose-50 text-rose-700 text-xs px-7 py-2.5 font-medium border-b border-rose-100">
+          <div className="bg-rose-50 text-rose-700 text-xs px-5 sm:px-7 py-2.5 font-medium border-b border-rose-100 shrink-0">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="p-7 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 sm:p-7 space-y-3.5 sm:space-y-4 overflow-y-auto">
           <div className="bg-slate-50 p-4 rounded-2xl flex items-center justify-between text-sm">
             <span className="text-slate-500 font-medium">Current Stock on Hand:</span>
             <span className="font-bold text-slate-900 text-base">

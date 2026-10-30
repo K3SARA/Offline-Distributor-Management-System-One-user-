@@ -150,18 +150,18 @@ export const LorrySettlement: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#F1F3F6] p-8 space-y-6">
+    <div className="flex-1 overflow-y-auto bg-[#F1F3F6] p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 pb-24 md:pb-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 sm:gap-4">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-blue-600 mb-1">
             <RotateCcw className="w-4 h-4" />
             <span>Step 4: End-of-Day Reconciliation</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
             Lorry Day-End Settlement
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
             Compare morning loaded items against sales bills. Unsold items return to Central Warehouse.
           </p>
         </div>
@@ -169,38 +169,38 @@ export const LorrySettlement: React.FC = () => {
 
       {/* Notifications */}
       {successMessage && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-800 text-sm font-medium animate-fadeIn">
+        <div className="p-3.5 sm:p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-800 text-xs sm:text-sm font-medium animate-fadeIn">
           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
           <span>{successMessage}</span>
         </div>
       )}
 
       {errorMessage && (
-        <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3 text-rose-800 text-sm font-medium animate-fadeIn">
+        <div className="p-3.5 sm:p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3 text-rose-800 text-xs sm:text-sm font-medium animate-fadeIn">
           <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
           <span>{errorMessage}</span>
         </div>
       )}
 
       {/* Lorry Selector Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">
         {lorries.map((lorry) => {
           const isSelected = lorry.id === selectedLorryId;
           return (
             <button
               key={lorry.id}
               onClick={() => handleLorrySelect(lorry.id)}
-              className={`text-left p-4 rounded-3xl border transition-all ${isSelected
+              className={`text-left p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border transition-all ${isSelected
                   ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-600 ring-offset-2'
                   : 'bg-white text-slate-800 border-slate-200/80 hover:border-slate-300'
                 }`}
             >
-              <div className="flex items-center gap-2.5 mb-2">
-                <Truck className="w-5 h-5" />
+              <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
+                <Truck className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span className="font-mono text-xs font-bold uppercase">{lorry.vehicleNumber}</span>
               </div>
               <div className="text-sm font-bold">{lorry.driverName}</div>
-              <div className={`text-xs mt-1 ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+              <div className={`text-xs mt-0.5 sm:mt-1 ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
                 {lorry.route?.name}
               </div>
             </button>
@@ -210,78 +210,76 @@ export const LorrySettlement: React.FC = () => {
 
       {/* Settlement Section */}
       {activeLoading ? (
-        <form onSubmit={handleCompleteSettlement} className="space-y-6">
+        <form onSubmit={handleCompleteSettlement} className="space-y-4 sm:space-y-6">
           {/* Quick Metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-            <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4">
+            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                 Morning Loaded
               </span>
-              <span className="text-xl font-bold text-slate-900 mt-1 block">
+              <span className="text-base sm:text-xl font-bold text-slate-900 mt-0.5 sm:mt-1 block">
                 {activeLoading.totalLoadedItems} Units
               </span>
-              <span className="text-xs text-slate-400">Gate Pass: {activeLoading.loadingNumber}</span>
+              <span className="text-[11px] text-slate-400 truncate block">Gate Pass: {activeLoading.loadingNumber}</span>
             </div>
 
-            <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs">
+            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                 Total Sold (Bills)
               </span>
-              <span className="text-xl font-bold text-emerald-600 mt-1 block">
+              <span className="text-base sm:text-xl font-bold text-emerald-600 mt-0.5 sm:mt-1 block">
                 {activeLoading.totalSoldItems} Units
               </span>
-              <span className="text-xs text-slate-400">Total: {formatMoney(activeLoading.totalSalesAmount)}</span>
+              <span className="text-[11px] text-slate-400 truncate block">{formatMoney(activeLoading.totalSalesAmount)}</span>
             </div>
 
-            <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs">
+            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                Expected Cash Collection
+                Expected Cash
               </span>
-              <span className="text-xl font-bold text-blue-600 mt-1 block">
+              <span className="text-base sm:text-xl font-bold text-blue-600 mt-0.5 sm:mt-1 block">
                 {formatMoney(activeLoading.cashCollected)}
               </span>
-              <span className="text-xs text-slate-400">Credit: {formatMoney(activeLoading.creditGiven)}</span>
+              <span className="text-[11px] text-slate-400 truncate block">Credit: {formatMoney(activeLoading.creditGiven)}</span>
             </div>
 
-            <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs">
+            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                Stock Discrepancy / Shortage
+                Stock Discrepancy
               </span>
               <span
-                className={`text-xl font-bold mt-1 block ${totalDiscrepancy > 0 ? 'text-rose-600' : 'text-slate-900'
+                className={`text-base sm:text-xl font-bold mt-0.5 sm:mt-1 block ${totalDiscrepancy > 0 ? 'text-rose-600' : 'text-slate-900'
                   }`}
               >
                 {totalDiscrepancy} Units
               </span>
-              <span className="text-xs text-slate-400">
-                {totalDiscrepancy === 0 ? 'Exact match' : 'Shortage detected'}
+              <span className="text-[11px] text-slate-400 block">
+                {totalDiscrepancy === 0 ? 'Exact match' : 'Shortage'}
               </span>
             </div>
           </div>
 
           {/* Stock Reconciliation Table */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                  Item Reconciliation & Unsold Return to Warehouse
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Verify returned physical items. Any returned units will be automatically added back to warehouse stock.
-                </p>
-              </div>
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs p-4 sm:p-6 space-y-3 sm:space-y-4">
+            <div className="border-b border-slate-100 pb-3">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider">
+                Item Reconciliation & Unsold Return
+              </h3>
+              <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
+                Verify returned physical items. Returned units will be added back to warehouse stock.
+              </p>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+              <table className="w-full text-left text-xs min-w-[560px]">
                 <thead>
                   <tr className="border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                     <th className="py-2.5 px-3">Product Name</th>
-                    <th className="py-2.5 px-3 text-center">Loaded (Morning)</th>
-                    <th className="py-2.5 px-3 text-center">Sold (Bills)</th>
-                    <th className="py-2.5 px-3 text-center">Expected Remaining</th>
-                    <th className="py-2.5 px-3 text-center">Actual Unsold Returned</th>
-                    <th className="py-2.5 px-3 text-right">Shortage / Diff</th>
+                    <th className="py-2.5 px-3 text-center">Loaded</th>
+                    <th className="py-2.5 px-3 text-center">Sold</th>
+                    <th className="py-2.5 px-3 text-center">Expected</th>
+                    <th className="py-2.5 px-3 text-center">Actual Returned</th>
+                    <th className="py-2.5 px-3 text-right">Shortage</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -308,7 +306,7 @@ export const LorrySettlement: React.FC = () => {
                             max={row.loadedQty}
                             value={row.returnedQty}
                             onChange={(e) => updateReturnedQty(index, parseInt(e.target.value, 10) || 0)}
-                            className="w-24 text-center bg-slate-50 border border-slate-200 rounded-xl px-2 py-1 font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-20 sm:w-24 text-center bg-slate-50 border border-slate-200 rounded-xl px-2 py-1 font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </td>
                         <td className="py-3 px-3 text-right font-mono font-bold">
@@ -317,7 +315,7 @@ export const LorrySettlement: React.FC = () => {
                           ) : diff < 0 ? (
                             <span className="text-amber-600">+{Math.abs(diff)}</span>
                           ) : (
-                            <span className="text-emerald-600">0 (Match)</span>
+                            <span className="text-emerald-600">0</span>
                           )}
                         </td>
                       </tr>
@@ -329,12 +327,12 @@ export const LorrySettlement: React.FC = () => {
           </div>
 
           {/* Cash Handover & Closing Remarks */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs p-6 space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs p-4 sm:p-6 space-y-4">
+            <h3 className="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider">
               Cash Handover & Audit Confirmation
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
                   Expected Cash From Bills
@@ -397,18 +395,18 @@ export const LorrySettlement: React.FC = () => {
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white text-xs font-bold rounded-2xl shadow-sm flex items-center gap-2 transition-all disabled:opacity-50"
+                className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white text-xs font-bold rounded-2xl shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>{submitting ? 'Finalizing Settlement...' : 'Complete Day Settlement & Return Stock to Warehouse'}</span>
+                <span>{submitting ? 'Finalizing...' : 'Complete Settlement & Return Stock'}</span>
               </button>
             </div>
           </div>
         </form>
       ) : (
-        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs p-12 text-center space-y-3">
-          <FileCheck2 className="w-12 h-12 text-slate-300 mx-auto" />
-          <h3 className="text-base font-bold text-slate-800">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs p-8 sm:p-12 text-center space-y-3">
+          <FileCheck2 className="w-10 h-10 sm:w-12 sm:h-12 text-slate-300 mx-auto" />
+          <h3 className="text-sm sm:text-base font-bold text-slate-800">
             No Active Loading Found for Lorry {selectedLorry?.vehicleNumber}
           </h3>
           <p className="text-xs text-slate-400 max-w-sm mx-auto">

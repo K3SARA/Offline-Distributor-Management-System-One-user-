@@ -130,69 +130,69 @@ export const Reports: React.FC = () => {
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-7 overflow-y-auto h-full">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6 overflow-y-auto h-full pb-24 md:pb-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/80 pb-6 print:hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-slate-200/80 pb-4 sm:pb-6 print:hidden">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-[#1D1D1F]">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1D1D1F]">
             Reports & Fleet Audit
           </h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <p className="text-slate-500 text-xs sm:text-sm mt-0.5 sm:mt-1">
             Reconciliation sheets for 3 lorries, route analysis, driver bills, and warehouse stock flow.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={exportCSV}
-            className="px-4 py-2.5 bg-white border border-slate-200/80 hover:bg-slate-50 text-slate-700 font-semibold rounded-2xl shadow-2xs transition text-xs flex items-center gap-2"
+            className="flex-1 sm:flex-initial px-3.5 sm:px-4 py-2 sm:py-2.5 bg-white border border-slate-200/80 hover:bg-slate-50 text-slate-700 font-semibold rounded-2xl shadow-2xs transition text-xs flex items-center justify-center gap-2"
           >
             <Download className="w-4 h-4" /> Export CSV
           </button>
           <button
             onClick={handlePrint}
-            className="px-4 py-2.5 bg-[#0071E3] hover:bg-blue-600 text-white font-semibold rounded-2xl shadow-sm transition text-xs flex items-center gap-2"
+            className="flex-1 sm:flex-initial px-3.5 sm:px-4 py-2 sm:py-2.5 bg-[#0071E3] hover:bg-blue-600 text-white font-semibold rounded-2xl shadow-sm transition text-xs flex items-center justify-center gap-2"
           >
-            <Printer className="w-4 h-4" /> Print Report
+            <Printer className="w-4 h-4" /> Print
           </button>
         </div>
       </div>
 
       {/* Toolbar: Report Tabs & Date Range Filter Bar */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 print:hidden">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4 print:hidden">
         {/* Report Tabs */}
-        <div className="flex gap-1.5 bg-slate-200/60 p-1.5 rounded-2xl w-fit flex-wrap">
+        <div className="flex gap-1 sm:gap-1.5 bg-slate-200/60 p-1 sm:p-1.5 rounded-2xl w-full sm:w-fit overflow-x-auto pb-1 sm:pb-1.5">
           <button
             onClick={() => setActiveTab('LORRIES')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition ${activeTab === 'LORRIES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'LORRIES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
               }`}
           >
-            <Truck className="w-3.5 h-3.5 text-blue-600" /> Lorry Settlement Audit
+            <Truck className="w-3.5 h-3.5 text-blue-600" /> Lorry Audit
           </button>
           <button
             onClick={() => setActiveTab('ROUTES')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition ${activeTab === 'ROUTES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'ROUTES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
               }`}
           >
-            <Compass className="w-3.5 h-3.5 text-emerald-600" /> Route Analysis
+            <Compass className="w-3.5 h-3.5 text-emerald-600" /> Routes
           </button>
           <button
             onClick={() => setActiveTab('SALES')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition ${activeTab === 'SALES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'SALES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
               }`}
           >
             <DollarSign className="w-3.5 h-3.5 text-amber-600" /> Driver Bills
           </button>
           <button
             onClick={() => setActiveTab('STOCK')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition ${activeTab === 'STOCK' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'STOCK' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
               }`}
           >
             <Boxes className="w-3.5 h-3.5 text-indigo-600" /> Stock Movements
           </button>
           <button
             onClick={() => setActiveTab('BALANCES')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition ${activeTab === 'BALANCES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'BALANCES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
               }`}
           >
             <Users className="w-3.5 h-3.5 text-purple-600" /> Receivables
@@ -209,12 +209,12 @@ export const Reports: React.FC = () => {
       </div>
 
       {/* REPORT CONTENT AREA */}
-      <div className="bg-white border border-slate-200/70 rounded-3xl shadow-2xs p-8 space-y-6">
+      <div className="bg-white border border-slate-200/70 rounded-2xl sm:rounded-3xl shadow-2xs p-4 sm:p-8 space-y-4 sm:space-y-6">
         {/* Printable Report Header */}
-        <div className="border-b border-slate-100 pb-4">
+        <div className="border-b border-slate-100 pb-3 sm:pb-4">
           <div className="flex justify-between items-start">
             <div>
-              <h2 className="text-xl font-bold text-slate-900">
+              <h2 className="text-lg sm:text-xl font-bold text-slate-900">
                 {activeTab === 'LORRIES' && 'Lorry Morning Load & Evening Settlement Audit'}
                 {activeTab === 'ROUTES' && '3 Routes Distribution Performance Analysis'}
                 {activeTab === 'SALES' && 'Daily Driver Sales Bills Log'}
@@ -233,8 +233,8 @@ export const Reports: React.FC = () => {
         {/* 1. LORRIES REPORT */}
         {activeTab === 'LORRIES' && (
           <div className="space-y-4">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
+            <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+              <table className="w-full text-left border-collapse text-xs min-w-[760px]">
                 <thead>
                   <tr className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-100">
                     <th className="p-3">Gate Pass #</th>
@@ -326,30 +326,30 @@ export const Reports: React.FC = () => {
 
         {/* 3. SALES REPORT */}
         {activeTab === 'SALES' && salesData && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-3 gap-6 bg-slate-50/70 p-6 rounded-2xl border border-slate-100">
+          <div className="space-y-4 sm:space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 bg-slate-50/70 p-4 sm:p-6 rounded-2xl border border-slate-100">
               <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-0.5 sm:mb-1">
                   Total Bills ({getPresetLabel()})
                 </span>
-                <span className="text-2xl font-bold text-slate-900">{salesData.ordersCount}</span>
+                <span className="text-xl sm:text-2xl font-bold text-slate-900">{salesData.ordersCount}</span>
               </div>
               <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-0.5 sm:mb-1">
                   Gross Subtotal
                 </span>
-                <span className="text-2xl font-bold text-slate-900 font-mono">{formatMoney(salesData.totalGross)}</span>
+                <span className="text-xl sm:text-2xl font-bold text-slate-900 font-mono">{formatMoney(salesData.totalGross)}</span>
               </div>
               <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-0.5 sm:mb-1">
                   Net Dispatched Sales
                 </span>
-                <span className="text-2xl font-bold text-emerald-700 font-mono">{formatMoney(salesData.totalNet)}</span>
+                <span className="text-xl sm:text-2xl font-bold text-emerald-700 font-mono">{formatMoney(salesData.totalNet)}</span>
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
+            <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+              <table className="w-full text-left border-collapse text-xs min-w-[720px]">
                 <thead>
                   <tr className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-100">
                     <th className="p-3">Bill #</th>
@@ -395,8 +395,8 @@ export const Reports: React.FC = () => {
 
         {/* 4. STOCK MOVEMENTS REPORT */}
         {activeTab === 'STOCK' && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+            <table className="w-full text-left border-collapse text-xs min-w-[720px]">
               <thead>
                 <tr className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-100">
                   <th className="p-3">Timestamp</th>
@@ -453,13 +453,13 @@ export const Reports: React.FC = () => {
 
         {/* 5. CUSTOMER BALANCES REPORT */}
         {activeTab === 'BALANCES' && balancesData && (
-          <div className="space-y-6">
-            <div className="bg-slate-50/80 p-6 rounded-2xl border border-slate-100 flex items-center justify-between">
+          <div className="space-y-4 sm:space-y-6">
+            <div className="bg-slate-50/80 p-4 sm:p-6 rounded-2xl border border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-0.5 sm:mb-1">
                   Total Outstanding Receivables Across All Accounts
                 </span>
-                <span className="text-3xl font-bold text-slate-900 font-mono">
+                <span className="text-2xl sm:text-3xl font-bold text-slate-900 font-mono">
                   {formatMoney(balancesData.totalOutstanding)}
                 </span>
               </div>
@@ -468,8 +468,8 @@ export const Reports: React.FC = () => {
               </span>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
+            <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+              <table className="w-full text-left border-collapse text-xs min-w-[700px]">
                 <thead>
                   <tr className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-100">
                     <th className="p-3">Client Code</th>

@@ -75,21 +75,21 @@ export const Customers: React.FC<{ onViewInvoice?: (order: Order) => void }> = (
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 overflow-y-auto h-full">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6 overflow-y-auto h-full pb-24 md:pb-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/80 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-slate-200/80 pb-4 sm:pb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-[#1D1D1F]">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1D1D1F]">
             Retail Accounts & Routes
           </h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <p className="text-slate-500 text-xs sm:text-sm mt-0.5 sm:mt-1">
             Retail store directory across Route 1, Route 2 & Route 3 with credit limits and outstanding receivables.
           </p>
         </div>
 
         <button
           onClick={openAddModal}
-          className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-[#0071E3] hover:bg-blue-600 active:scale-[0.98] text-white font-semibold rounded-2xl shadow-sm transition text-xs"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 bg-[#0071E3] hover:bg-blue-600 active:scale-[0.98] text-white font-semibold rounded-2xl shadow-sm transition text-xs"
         >
           <Plus className="w-4 h-4 stroke-[2.5]" />
           Register New Client
@@ -97,19 +97,19 @@ export const Customers: React.FC<{ onViewInvoice?: (order: Order) => void }> = (
       </div>
 
       {/* Search & Route Filter Bar */}
-      <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="bg-white p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
         <div className="relative w-full sm:w-96">
           <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
           <input
             type="text"
-            placeholder="Search by client name, code, phone, or company..."
+            placeholder="Search by client name, code, phone..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#0071E3] font-medium"
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#0071E3] font-medium"
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
           <button
             onClick={() => setSelectedRouteId('ALL')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
@@ -137,7 +137,7 @@ export const Customers: React.FC<{ onViewInvoice?: (order: Order) => void }> = (
       </div>
 
       {/* Customer Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
         {customers.map((c) => (
           <div
             key={c.id}
@@ -219,12 +219,12 @@ export const Customers: React.FC<{ onViewInvoice?: (order: Order) => void }> = (
       {/* History Drawer Modal */}
       {historyCustomer && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-end">
-          <div className="bg-white h-full w-full max-w-xl p-8 overflow-y-auto space-y-6 shadow-2xl flex flex-col justify-between">
+          <div className="bg-white h-full w-full max-w-xl p-5 sm:p-8 overflow-y-auto space-y-4 sm:space-y-6 shadow-2xl flex flex-col justify-between">
             <div>
-              <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-start justify-between border-b border-slate-100 pb-3 sm:pb-4">
                 <div>
                   <span className="text-xs font-mono font-bold text-slate-400">{historyCustomer.code}</span>
-                  <h2 className="text-2xl font-bold text-slate-900">{historyCustomer.name}</h2>
+                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900">{historyCustomer.name}</h2>
                   <p className="text-xs text-slate-500 mt-0.5">{historyCustomer.deliveryAddress}, {historyCustomer.city}</p>
                 </div>
                 <button
