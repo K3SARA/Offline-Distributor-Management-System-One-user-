@@ -411,15 +411,31 @@ export const LorryLoading: React.FC = () => {
 
             {activeLoading ? (
               <div className="space-y-3">
-                <div className="bg-slate-50 p-3 rounded-2xl space-y-1 text-xs">
+                <div className="bg-slate-50 p-3 rounded-2xl space-y-1.5 text-xs">
                   <div className="flex justify-between text-slate-500 font-medium">
                     <span>Gate Pass #:</span>
                     <span className="font-mono font-bold text-slate-900">{activeLoading.loadingNumber}</span>
                   </div>
                   <div className="flex justify-between text-slate-500 font-medium">
-                    <span>Loaded Units:</span>
+                    <span>Loaded Units (This Lorry):</span>
                     <span className="font-bold text-slate-900">{activeLoading.totalLoadedItems}</span>
                   </div>
+                  
+                  {/* Total Units from all three lorries */}
+                  <div className="flex justify-between items-center py-2 px-2.5 bg-blue-50/90 border border-blue-200/80 rounded-xl my-1.5 shadow-2xs">
+                    <div className="flex items-center gap-1.5 text-blue-900 font-bold text-xs">
+                      <Truck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span>Total Units (All 3 Lorries):</span>
+                    </div>
+                    <span className="font-mono font-bold text-blue-700 text-sm">
+                      {lorries.reduce((acc, l) => {
+                        const lLoaded = l.loadings?.[0]?.status !== 'SETTLED' ? (l.loadings?.[0]?.totalLoadedItems || 0) : 0;
+                        const lFloating = l.lorryStocks?.reduce((sum, s) => sum + s.quantity, 0) || 0;
+                        return acc + (lLoaded > 0 ? lLoaded : lFloating);
+                      }, 0)} Units
+                    </span>
+                  </div>
+
                   <div className="flex justify-between text-slate-500 font-medium">
                     <span>Sold via Bills:</span>
                     <span className="font-bold text-emerald-600">{activeLoading.totalSoldItems}</span>
@@ -427,6 +443,34 @@ export const LorryLoading: React.FC = () => {
                   <div className="flex justify-between text-slate-500 font-medium">
                     <span>Total Sales:</span>
                     <span className="font-bold text-blue-600">{formatMoney(activeLoading.totalSalesAmount)}</span>
+                  </div>
+
+                  {/* All 3 Lorries Units Breakdown */}
+                  <div className="pt-2 border-t border-slate-200/70 mt-1 space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      All 3 Lorries Loaded Units:
+                    </span>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {lorries.map((l) => {
+                        const lLoaded = l.loadings?.[0]?.status !== 'SETTLED' ? (l.loadings?.[0]?.totalLoadedItems || 0) : 0;
+                        const lFloating = l.lorryStocks?.reduce((sum, s) => sum + s.quantity, 0) || 0;
+                        const count = lLoaded > 0 ? lLoaded : lFloating;
+                        const isCurrent = l.id === selectedLorryId;
+                        return (
+                          <div
+                            key={l.id}
+                            className={`p-1.5 rounded-lg text-center border text-[11px] ${
+                              isCurrent
+                                ? 'bg-blue-100/70 border-blue-300 font-bold text-blue-900 shadow-2xs'
+                                : 'bg-white border-slate-200/70 text-slate-700'
+                            }`}
+                          >
+                            <span className="font-mono text-[9px] block text-slate-400 truncate">{l.vehicleNumber}</span>
+                            <span className="font-mono font-bold">{count} u</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
@@ -451,10 +495,42 @@ export const LorryLoading: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="text-center py-8 text-xs text-slate-400 space-y-1">
-                <Boxes className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-                <p className="font-medium">No active loading sheet for today.</p>
-                <p className="text-[11px] text-slate-400">Fill items above to dispatch this lorry.</p>
+              <div className="text-center py-6 text-xs text-slate-400 space-y-3">
+                <Boxes className="w-8 h-8 mx-auto text-slate-300" />
+                <div>
+                  <p className="font-medium text-slate-700">No active loading sheet for this lorry today.</p>
+                  <p className="text-[11px] text-slate-400">Fill items above to dispatch this lorry.</p>
+                </div>
+                
+                {/* Total across 3 lorries even if current lorry is empty */}
+                <div className="bg-slate-50 p-3 rounded-2xl text-left border border-slate-100 space-y-1.5">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                      <Truck className="w-3.5 h-3.5 text-blue-600" />
+                      Total Units (All 3 Lorries):
+                    </span>
+                    <span className="font-mono font-bold text-blue-700">
+                      {lorries.reduce((acc, l) => {
+                        const lLoaded = l.loadings?.[0]?.status !== 'SETTLED' ? (l.loadings?.[0]?.totalLoadedItems || 0) : 0;
+                        const lFloating = l.lorryStocks?.reduce((sum, s) => sum + s.quantity, 0) || 0;
+                        return acc + (lLoaded > 0 ? lLoaded : lFloating);
+                      }, 0)} Units
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5 pt-1">
+                    {lorries.map((l) => {
+                      const lLoaded = l.loadings?.[0]?.status !== 'SETTLED' ? (l.loadings?.[0]?.totalLoadedItems || 0) : 0;
+                      const lFloating = l.lorryStocks?.reduce((sum, s) => sum + s.quantity, 0) || 0;
+                      const count = lLoaded > 0 ? lLoaded : lFloating;
+                      return (
+                        <div key={l.id} className="bg-white p-1.5 rounded-lg border border-slate-200/70 text-center text-[11px]">
+                          <span className="font-mono text-[9px] text-slate-400 block truncate">{l.vehicleNumber}</span>
+                          <span className="font-mono font-bold text-slate-800">{count} u</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             )}
           </div>
