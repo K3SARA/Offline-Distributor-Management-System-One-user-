@@ -1,0 +1,96 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// --------------------------------------------------------
+// 1. PRODUCTS & INVENTORY
+// --------------------------------------------------------
+model Product {
+  id             String          @id @default(uuid())
+  sku            String          @unique
+  name           String
+  category       String          @default("General")
+  unit           String          @default("Unit") // e.g., Case, Box, Pack, Kg
+  unitPrice      Float           // Base selling price
+  costPrice      Float           // Purchase cost price
+  currentStock   Int             @default(0)
+  minStockAlert  Int             @default(10)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  orderItems     OrderItem[]
+  stockMovements StockMovement[]
+}
+
+model StockMovement {
+  id          String   @id @default(uuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type        String   // INBOUND, OUTBOUND, ADJUSTMENT, RETURN
+  quantity    Int      // Positive for Inbound/Return, Negative or recorded as dispatched count
+  referenceId String?  // Linked Order ID or Supplier Invoice #
+  notes       String?
+  createdAt   DateTime @default(now())
+}
+
+// --------------------------------------------------------
+// 2. CUSTOMERS & CLIENTS
+// --------------------------------------------------------
+model Customer {
+  id                 String   @id @default(uuid())
+  code               String   @unique // e.g. "CUST-001"
+  name               String
+  companyName        String?
+  phone              String
+  deliveryAddress    String
+  city               String   @default("Local")
+  pricingTier        String   @default("STANDARD") // STANDARD, WHOLESALE, VIP
+  discountPercentage Float    @default(0.0) // Flat discount %
+  creditLimit        Float    @default(5000.0)
+  outstandingBalance Float    @default(0.0) // Current credit balance
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  orders             Order[]
+}
+
+// --------------------------------------------------------
+// 3. ORDERS & DISTRIBUTION WORKFLOW
+// --------------------------------------------------------
+model Order {
+  id              String      @id @default(uuid())
+  orderNumber     String      @unique // e.g. "ORD-20261030-0001"
+  customerId      String
+  customer        Customer    @relation(fields: [customerId], references: [id])
+  status          String      @default("PENDING") // PENDING, DISPATCHED, DELIVERED, CANCELLED
+  paymentStatus   String      @default("UNPAID") // UNPAID, PARTIAL, PAID
+  
+  subtotal        Float
+  discountAmount  Float       @default(0.0)
+  taxAmount       Float       @default(0.0)
+  netTotal        Float
+
+  notes           String?
+  dispatchedAt    DateTime?
+  deliveredAt     DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  items           OrderItem[]
+}
+
+model OrderItem {
+  id         String   @id @default(uuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id])
+  quantity   Int
+  unitPrice  Float
+  lineTotal  Float
+}

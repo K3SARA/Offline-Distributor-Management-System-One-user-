@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.local
+dist/
+electron/dist/
+distributor.db
+distributor.db-journal
+*.log
+npm-debug.log*
+.DS_Store

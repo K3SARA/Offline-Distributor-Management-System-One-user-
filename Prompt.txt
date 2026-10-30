@@ -1,0 +1,60 @@
+Act as a senior full-stack desktop application developer. I need to build a comprehensive Desktop Application for a client to manage their entire distribution system.
+
+Core Tech Stack:
+
+Desktop Wrapper: Electron (or Tauri)
+
+Frontend: React, Tailwind CSS
+
+Backend: Node.js, Express
+
+Database: Local SQLite (or PostgreSQL if hosted) managed via Prisma ORM
+
+Design & UX Requirements:
+The end-users are entirely non-technical. The UI must be ultra-minimal, high-contrast, and Apple-inspired. Avoid complex nested menus, technical jargon, or cluttered dashboards. Use large, legible typography, clear iconography, and spacious data tables.
+
+Please generate the code, architecture, and step-by-step implementation plan for the following core modules:
+
+1. Inventory & Stock Management
+
+CRUD operations for all products.
+
+Real-time stock level tracking with low-stock alerts.
+
+Inbound (receiving stock) and outbound (dispatching stock) logging.
+
+2. Customer & Client Management
+
+Database of all clients/distributors with contact details, delivery addresses, and order history.
+
+Client-specific pricing tiers or discount profiles if applicable.
+
+3. Order & Distribution Workflow
+
+A highly intuitive point-of-sale (POS) or order-entry screen to quickly create new distribution orders.
+
+Status tracking for orders (e.g., Pending, Dispatched, Delivered).
+
+Generation of digital invoices and delivery notes.
+
+4. Reporting & Analytics
+
+A simplified, high-level dashboard showing today's dispatched orders, low stock items, and revenue.
+
+Printable/Exportable reports (PDF/CSV) for:
+
+End-of-day sales and distribution summaries.
+
+Stock movement history.
+
+Customer outstanding balances.
+
+Deliverables Required from You (The AI):
+
+The complete folder structure for the Electron + React + Node project.
+
+The Prisma schema.prisma file modeling Products, Customers, Orders, and OrderItems.
+
+The Express server setup for handling local API requests.
+
+The React code for the main Dashboard and Order Entry screens using Tailwind CSS for the high-contrast, minimal design.
