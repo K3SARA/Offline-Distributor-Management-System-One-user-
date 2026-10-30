@@ -163,7 +163,14 @@ export const Inventory: React.FC = () => {
                       </td>
                       <td className="px-6 py-4">
                         <span className="font-semibold text-slate-900 block">{p.name}</span>
-                        <span className="text-[10px] text-slate-400">Pack: {p.unit}</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] text-slate-400">Pack: {p.unit}</span>
+                          {p.freeRatioBuy && p.freeRatioBuy > 0 && p.freeRatioGet ? (
+                            <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 font-semibold rounded text-[10px]">
+                              Promo: Buy {p.freeRatioBuy} + {p.freeRatioGet} Free
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-xs font-medium text-slate-600">
                         <span className="px-2.5 py-1 bg-slate-100 rounded-lg">

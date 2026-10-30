@@ -21,6 +21,7 @@ import { useCurrency } from '../context/CurrencyContext';
 interface BillItemRow {
   productId: string;
   quantity: number;
+  freeQuantity: number;
 }
 
 interface BillEntryProps {
@@ -37,7 +38,7 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
   // Bill Form state
   const [paperBillNumber, setPaperBillNumber] = useState<string>('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
-  const [billItems, setBillItems] = useState<BillItemRow[]>([{ productId: '', quantity: 1 }]);
+  const [billItems, setBillItems] = useState<BillItemRow[]>([{ productId: '', quantity: 1, freeQuantity: 0 }]);
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CREDIT' | 'CHEQUE'>('CASH');
   const [cashReceived, setCashReceived] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
@@ -83,18 +84,34 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
   const otherCustomers = customers.filter(c => !selectedLorry?.routeId || c.routeId !== selectedLorry.routeId);
 
   const addItemRow = () => {
-    setBillItems([...billItems, { productId: '', quantity: 1 }]);
+    setBillItems([...billItems, { productId: '', quantity: 1, freeQuantity: 0 }]);
   };
 
   const updateItemRow = (index: number, field: keyof BillItemRow, value: any) => {
     const updated = [...billItems];
-    updated[index] = { ...updated[index], [field]: value };
+    const currentRow = { ...updated[index], [field]: value };
+
+    // Auto-calculate free issues if trade scheme exists and productId or quantity changed
+    if (field === 'productId' || field === 'quantity') {
+      const targetProdId = field === 'productId' ? value : currentRow.productId;
+      const stockItem = availableLorryProducts.find(s => s.productId === targetProdId);
+      const buyRatio = stockItem?.product.freeRatioBuy || 0;
+      const getRatio = stockItem?.product.freeRatioGet || 0;
+
+      if (buyRatio > 0 && getRatio > 0 && currentRow.quantity > 0) {
+        currentRow.freeQuantity = Math.floor(currentRow.quantity / buyRatio) * getRatio;
+      } else if (field === 'productId') {
+        currentRow.freeQuantity = 0;
+      }
+    }
+
+    updated[index] = currentRow;
     setBillItems(updated);
   };
 
   const removeItemRow = (index: number) => {
     if (billItems.length === 1) {
-      setBillItems([{ productId: '', quantity: 1 }]);
+      setBillItems([{ productId: '', quantity: 1, freeQuantity: 0 }]);
       return;
     }
     setBillItems(billItems.filter((_, i) => i !== index));
@@ -113,6 +130,8 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
   const discountPercent = selectedCustomer?.discountPercentage || 0;
   const discountAmount = (subtotal * discountPercent) / 100;
   const netTotal = subtotal - discountAmount;
+  const totalBilledUnits = billItems.reduce((acc, item) => acc + (item.quantity || 0), 0);
+  const totalFreeUnits = billItems.reduce((acc, item) => acc + (item.freeQuantity || 0), 0);
 
   // Auto set cash received if cash mode
   useEffect(() => {
@@ -143,12 +162,13 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
       return;
     }
 
-    // Validate floating lorry stock
+    // Validate floating lorry stock (paid + free units)
     for (const line of validItems) {
       const stockItem = availableLorryProducts.find(s => s.productId === line.productId);
-      if (!stockItem || stockItem.quantity < line.quantity) {
+      const totalUnits = (line.quantity || 0) + (line.freeQuantity || 0);
+      if (!stockItem || stockItem.quantity < totalUnits) {
         setErrorMessage(
-          `Insufficient stock on Lorry ${selectedLorry?.vehicleNumber} for "${stockItem?.product.name || 'Selected Item'}". Only ${stockItem?.quantity || 0} units available.`
+          `Insufficient stock on Lorry ${selectedLorry?.vehicleNumber} for "${stockItem?.product.name || 'Selected Item'}". Only ${stockItem?.quantity || 0} units available, bill requires ${line.quantity} sold + ${line.freeQuantity || 0} free (${totalUnits} total).`
         );
         return;
       }
@@ -160,19 +180,23 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
       const createdOrder = await LorryService.enterDriverBill(selectedLorryId, {
         paperBillNumber: paperBillNumber.trim() || undefined,
         customerId: selectedCustomerId,
-        items: validItems,
+        items: validItems.map(i => ({
+          productId: i.productId,
+          quantity: i.quantity,
+          freeQuantity: i.freeQuantity || 0
+        })),
         paymentMethod,
         cashReceived: parsedCash,
         notes: notes.trim() || undefined
       });
 
       setSuccessMessage(
-        `Bill #${paperBillNumber || createdOrder.orderNumber} successfully entered for ${createdOrder.customer.name}! Lorry floating stock deducted.`
+        `Bill #${paperBillNumber || createdOrder.orderNumber} successfully entered for ${createdOrder.customer.name}! (${totalBilledUnits} paid + ${totalFreeUnits} free units deducted from lorry)`
       );
 
       // Reset form
       setPaperBillNumber('');
-      setBillItems([{ productId: '', quantity: 1 }]);
+      setBillItems([{ productId: '', quantity: 1, freeQuantity: 0 }]);
       setNotes('');
 
       // Refresh list
@@ -345,11 +369,12 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
                   const stockItem = availableLorryProducts.find(s => s.productId === item.productId);
                   const price = stockItem ? stockItem.product.unitPrice : 0;
                   const lineTotal = price * (item.quantity || 0);
+                  const hasScheme = stockItem && stockItem.product.freeRatioBuy && stockItem.product.freeRatioBuy > 0 && stockItem.product.freeRatioGet;
 
                   return (
                     <div
                       key={index}
-                      className="flex flex-col sm:flex-row items-center gap-3 p-3 bg-slate-50 border border-slate-200/70 rounded-2xl"
+                      className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 p-3 bg-slate-50 border border-slate-200/70 rounded-2xl"
                     >
                       {/* Product Selector */}
                       <div className="flex-1 w-full">
@@ -362,39 +387,65 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
                           <option value="">-- Select Item on Lorry --</option>
                           {availableLorryProducts.map((s) => (
                             <option key={s.productId} value={s.productId}>
-                              {s.product.name} (Lorry Stock: {s.quantity} {s.product.unit}) - {formatMoney(s.product.unitPrice)}
+                              {s.product.name} (Lorry Stock: {s.quantity} {s.product.unit})
+                              {s.product.freeRatioBuy && s.product.freeRatioBuy > 0 && s.product.freeRatioGet
+                                ? ` ★ Promo: Buy ${s.product.freeRatioBuy} get ${s.product.freeRatioGet} Free`
+                                : ''} - {formatMoney(s.product.unitPrice)}
                             </option>
                           ))}
                         </select>
                       </div>
 
-                      {/* Qty */}
-                      <div className="w-full sm:w-28">
-                        <input
-                          type="number"
-                          min="1"
-                          max={stockItem ? stockItem.quantity : 9999}
-                          value={item.quantity || ''}
-                          onChange={(e) => updateItemRow(index, 'quantity', parseInt(e.target.value, 10) || 0)}
-                          placeholder="Qty"
-                          required
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
+                      {/* Quantity Controls Grid */}
+                      <div className="flex items-center gap-2">
+                        {/* Paid Qty */}
+                        <div className="w-24">
+                          <input
+                            type="number"
+                            min="1"
+                            max={stockItem ? stockItem.quantity : 9999}
+                            value={item.quantity || ''}
+                            onChange={(e) => updateItemRow(index, 'quantity', parseInt(e.target.value, 10) || 0)}
+                            placeholder="Paid Qty"
+                            title="Billed / Paid Quantity"
+                            required
+                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
+                          />
+                        </div>
 
-                      {/* Line Total */}
-                      <div className="w-full sm:w-28 text-right sm:text-right font-mono text-xs font-bold text-slate-800">
-                        {formatMoney(lineTotal)}
-                      </div>
+                        {/* Free Issue Qty */}
+                        <div className="w-24 relative">
+                          <input
+                            type="number"
+                            min="0"
+                            max={stockItem ? stockItem.quantity : 9999}
+                            value={item.freeQuantity !== undefined ? item.freeQuantity : ''}
+                            onChange={(e) => updateItemRow(index, 'freeQuantity', parseInt(e.target.value, 10) || 0)}
+                            placeholder="0 Free"
+                            title="Promotional Free Issue (Rs. 0)"
+                            className="w-full bg-emerald-50/70 border border-emerald-200 text-emerald-900 rounded-xl px-2 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500 text-center"
+                          />
+                          {hasScheme && item.quantity > 0 && (
+                            <span className="hidden sm:inline-block absolute -top-2 right-1 px-1 bg-emerald-600 text-[8px] font-bold text-white rounded">
+                              Auto
+                            </span>
+                          )}
+                        </div>
 
-                      {/* Delete */}
-                      <button
-                        type="button"
-                        onClick={() => removeItemRow(index)}
-                        className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-white transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                        {/* Line Total */}
+                        <div className="w-24 text-right font-mono text-xs font-bold text-slate-800">
+                          {formatMoney(lineTotal)}
+                        </div>
+
+                        {/* Delete */}
+                        <button
+                          type="button"
+                          onClick={() => removeItemRow(index)}
+                          className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-white transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   );
                 })
@@ -456,7 +507,15 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
 
             {/* Calculations & Submit */}
             <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-6">
+              <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Units Outflow
+                  </span>
+                  <span className="text-xs font-mono font-semibold text-slate-700">
+                    {totalBilledUnits} Paid {totalFreeUnits > 0 && <span className="text-emerald-600 font-bold">(+{totalFreeUnits} Free)</span>}
+                  </span>
+                </div>
                 <div>
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                     Subtotal

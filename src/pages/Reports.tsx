@@ -90,9 +90,9 @@ export const Reports: React.FC = () => {
     let csvContent = 'data:text/csv;charset=utf-8,';
 
     if (activeTab === 'LORRIES') {
-      csvContent += 'Loading Number,Date,Lorry,Driver,Route,Status,Loaded Units,Sold Units,Returned Units,Sales Amount,Cash Collected\n';
+      csvContent += 'Loading Number,Date,Lorry,Driver,Route,Status,Loaded Units,Paid Sold Units,Free Issue Units,Returned Units,Sales Amount,Cash Collected\n';
       lorryLoadings.forEach((l) => {
-        csvContent += `"${l.loadingNumber}","${new Date(l.date).toLocaleDateString()}","${l.lorry.vehicleNumber}","${l.lorry.driverName}","${l.lorry.route?.name || ''}","${l.status}",${l.totalLoadedItems},${l.totalSoldItems},${l.totalReturnedItems},${l.totalSalesAmount},${l.cashCollected}\n`;
+        csvContent += `"${l.loadingNumber}","${new Date(l.date).toLocaleDateString()}","${l.lorry.vehicleNumber}","${l.lorry.driverName}","${l.lorry.route?.name || ''}","${l.status}",${l.totalLoadedItems},${l.totalSoldItems},${l.totalFreeItems || 0},${l.totalReturnedItems},${l.totalSalesAmount},${l.cashCollected}\n`;
       });
     } else if (activeTab === 'ROUTES') {
       csvContent += 'Route Code,Route Name,Driver / Lorry,Customers,Total Bills,Total Sales,Cash Collected,Credit Given\n';
@@ -242,7 +242,8 @@ export const Reports: React.FC = () => {
                     <th className="p-3">Lorry / Driver</th>
                     <th className="p-3">Route</th>
                     <th className="p-3 text-center">Loaded</th>
-                    <th className="p-3 text-center">Sold</th>
+                    <th className="p-3 text-center">Paid Sold</th>
+                    <th className="p-3 text-center">Free Issued</th>
                     <th className="p-3 text-center">Returned</th>
                     <th className="p-3 text-right">Sales Value</th>
                     <th className="p-3 text-right">Cash Handover</th>
@@ -252,7 +253,7 @@ export const Reports: React.FC = () => {
                 <tbody className="divide-y divide-slate-100">
                   {lorryLoadings.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="p-8 text-center text-slate-400">
+                      <td colSpan={11} className="p-8 text-center text-slate-400">
                         No lorry loadings recorded for {getPresetLabel().toLowerCase()}.
                       </td>
                     </tr>
@@ -270,6 +271,15 @@ export const Reports: React.FC = () => {
                         <td className="p-3 font-medium text-slate-700">{load.lorry.route?.name || '—'}</td>
                         <td className="p-3 text-center font-mono font-bold text-slate-900">{load.totalLoadedItems}</td>
                         <td className="p-3 text-center font-mono font-bold text-emerald-600">{load.totalSoldItems}</td>
+                        <td className="p-3 text-center font-mono font-semibold text-blue-600">
+                          {load.totalFreeItems > 0 ? (
+                            <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded">
+                              +{load.totalFreeItems}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300">0</span>
+                          )}
+                        </td>
                         <td className="p-3 text-center font-mono font-bold text-blue-600">{load.totalReturnedItems}</td>
                         <td className="p-3 text-right font-mono font-bold text-slate-900">{formatMoney(load.totalSalesAmount)}</td>
                         <td className="p-3 text-right font-mono font-bold text-emerald-600">{formatMoney(load.cashCollected)}</td>

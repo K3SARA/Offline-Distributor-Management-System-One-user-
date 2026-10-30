@@ -21,6 +21,7 @@ interface ReturnRow {
   unit: string;
   loadedQty: number;
   soldQty: number;
+  freeQty: number;
   expectedRemaining: number;
   returnedQty: number;
 }
@@ -66,13 +67,15 @@ export const LorrySettlement: React.FC = () => {
 
       if (active) {
         const rows: ReturnRow[] = active.items.map(item => {
-          const expected = Math.max(0, item.loadedQty - item.soldQty);
+          const totalOutflow = item.soldQty + (item.freeQty || 0);
+          const expected = Math.max(0, item.loadedQty - totalOutflow);
           return {
             productId: item.productId,
             productName: item.product.name,
             unit: item.product.unit,
             loadedQty: item.loadedQty,
             soldQty: item.soldQty,
+            freeQty: item.freeQty || 0,
             expectedRemaining: expected,
             returnedQty: expected // Pre-populate with expected remaining
           };
@@ -230,7 +233,9 @@ export const LorrySettlement: React.FC = () => {
               <span className="text-base sm:text-xl font-bold text-emerald-600 mt-0.5 sm:mt-1 block">
                 {activeLoading.totalSoldItems} Units
               </span>
-              <span className="text-[11px] text-slate-400 truncate block">{formatMoney(activeLoading.totalSalesAmount)}</span>
+              <span className="text-[11px] text-slate-400 truncate block">
+                {formatMoney(activeLoading.totalSalesAmount)} {activeLoading.totalFreeItems > 0 ? `(+${activeLoading.totalFreeItems} Free)` : ''}
+              </span>
             </div>
 
             <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs">
@@ -271,13 +276,14 @@ export const LorrySettlement: React.FC = () => {
             </div>
 
             <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-              <table className="w-full text-left text-xs min-w-[560px]">
+              <table className="w-full text-left text-xs min-w-[620px]">
                 <thead>
                   <tr className="border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                     <th className="py-2.5 px-3">Product Name</th>
                     <th className="py-2.5 px-3 text-center">Loaded</th>
-                    <th className="py-2.5 px-3 text-center">Sold</th>
-                    <th className="py-2.5 px-3 text-center">Expected</th>
+                    <th className="py-2.5 px-3 text-center">Paid Sold</th>
+                    <th className="py-2.5 px-3 text-center">Free Issued</th>
+                    <th className="py-2.5 px-3 text-center">Expected Left</th>
                     <th className="py-2.5 px-3 text-center">Actual Returned</th>
                     <th className="py-2.5 px-3 text-right">Shortage</th>
                   </tr>
@@ -296,7 +302,16 @@ export const LorrySettlement: React.FC = () => {
                         <td className="py-3 px-3 text-center font-mono font-bold text-emerald-600">
                           {row.soldQty} {row.unit}
                         </td>
-                        <td className="py-3 px-3 text-center font-mono font-bold text-blue-600">
+                        <td className="py-3 px-3 text-center font-mono font-semibold text-blue-600">
+                          {row.freeQty > 0 ? (
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md">
+                              +{row.freeQty} {row.unit}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">0</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-3 text-center font-mono font-bold text-slate-800">
                           {row.expectedRemaining} {row.unit}
                         </td>
                         <td className="py-3 px-3 text-center">

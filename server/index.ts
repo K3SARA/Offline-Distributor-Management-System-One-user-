@@ -70,6 +70,8 @@ app.post('/api/products', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'SKU, Name, and Unit Price are required.' });
     }
 
+    const { freeRatioBuy, freeRatioGet } = req.body;
+
     const product = await prisma.product.create({
       data: {
         sku: sku.trim().toUpperCase(),
@@ -79,7 +81,9 @@ app.post('/api/products', async (req: Request, res: Response) => {
         unitPrice: parseFloat(unitPrice),
         costPrice: parseFloat(costPrice || 0),
         currentStock: parseInt(currentStock || 0, 10),
-        minStockAlert: parseInt(minStockAlert || 10, 10)
+        minStockAlert: parseInt(minStockAlert || 10, 10),
+        freeRatioBuy: freeRatioBuy ? parseInt(freeRatioBuy, 10) : 0,
+        freeRatioGet: freeRatioGet ? parseInt(freeRatioGet, 10) : 0
       }
     });
 
@@ -104,7 +108,7 @@ app.post('/api/products', async (req: Request, res: Response) => {
 app.put('/api/products/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { sku, name, category, unit, unitPrice, costPrice, minStockAlert } = req.body;
+    const { sku, name, category, unit, unitPrice, costPrice, minStockAlert, freeRatioBuy, freeRatioGet } = req.body;
 
     const updated = await prisma.product.update({
       where: { id },
@@ -115,7 +119,9 @@ app.put('/api/products/:id', async (req: Request, res: Response) => {
         unit: unit?.trim(),
         unitPrice: unitPrice !== undefined ? parseFloat(unitPrice) : undefined,
         costPrice: costPrice !== undefined ? parseFloat(costPrice) : undefined,
-        minStockAlert: minStockAlert !== undefined ? parseInt(minStockAlert, 10) : undefined
+        minStockAlert: minStockAlert !== undefined ? parseInt(minStockAlert, 10) : undefined,
+        freeRatioBuy: freeRatioBuy !== undefined ? parseInt(freeRatioBuy, 10) : undefined,
+        freeRatioGet: freeRatioGet !== undefined ? parseInt(freeRatioGet, 10) : undefined
       }
     });
 
@@ -492,7 +498,10 @@ app.post('/api/lorries/:id/bills', async (req: Request, res: Response) => {
       // Validate Lorry floating inventory
       for (const item of items) {
         const qty = parseInt(item.quantity, 10);
+        const freeQty = parseInt(item.freeQuantity, 10) || 0;
         if (isNaN(qty) || qty <= 0) continue;
+
+        const totalNeeded = qty + (freeQty > 0 ? freeQty : 0);
 
         const lorryStock = await tx.lorryStock.findUnique({
           where: {
@@ -507,9 +516,9 @@ app.post('/api/lorries/:id/bills', async (req: Request, res: Response) => {
         const product = lorryStock?.product || await tx.product.findUniqueOrThrow({ where: { id: item.productId } });
         const availableInLorry = lorryStock?.quantity || 0;
 
-        if (availableInLorry < qty) {
+        if (availableInLorry < totalNeeded) {
           throw new Error(
-            `Insufficient stock on Lorry ${lorry.vehicleNumber} for "${product.name}". Available in lorry: ${availableInLorry} ${product.unit}, bill requires: ${qty}`
+            `Insufficient stock on Lorry ${lorry.vehicleNumber} for "${product.name}". Available in lorry: ${availableInLorry} ${product.unit}, bill requires: ${qty} sold + ${freeQty} free (${totalNeeded} total)`
           );
         }
 
@@ -519,11 +528,12 @@ app.post('/api/lorries/:id/bills', async (req: Request, res: Response) => {
         orderItemsToCreate.push({
           productId: product.id,
           quantity: qty,
+          freeQuantity: freeQty,
           unitPrice: product.unitPrice,
           lineTotal
         });
 
-        // 1. Deduct from Lorry Floating Stock
+        // 1. Deduct from Lorry Floating Stock (both sold + free units)
         await tx.lorryStock.update({
           where: {
             lorryId_productId: {
@@ -531,16 +541,19 @@ app.post('/api/lorries/:id/bills', async (req: Request, res: Response) => {
               productId: item.productId
             }
           },
-          data: { quantity: { decrement: qty } }
+          data: { quantity: { decrement: totalNeeded } }
         });
 
-        // 2. Update active loading sheet sold quantities if exists
+        // 2. Update active loading sheet sold & free quantities if exists
         if (activeLoading) {
           const loadingItem = activeLoading.items.find(li => li.productId === item.productId);
           if (loadingItem) {
             await tx.lorryLoadingItem.update({
               where: { id: loadingItem.id },
-              data: { soldQty: { increment: qty } }
+              data: {
+                soldQty: { increment: qty },
+                freeQty: { increment: freeQty }
+              }
             });
           }
         }
@@ -611,6 +624,7 @@ app.post('/api/lorries/:id/bills', async (req: Request, res: Response) => {
           where: { id: activeLoading.id },
           data: {
             totalSoldItems: { increment: orderItemsToCreate.reduce((a, b) => a + b.quantity, 0) },
+            totalFreeItems: { increment: orderItemsToCreate.reduce((a, b) => a + (b.freeQuantity || 0), 0) },
             totalSalesAmount: { increment: netTotal },
             cashCollected: { increment: paidAmount },
             creditGiven: { increment: creditAmount > 0 ? creditAmount : 0 }
@@ -679,7 +693,8 @@ app.post('/api/lorries/:id/settle', async (req: Request, res: Response) => {
         // 2. Update loading item line (returned + calculate discrepancy)
         const itemLine = loading.items.find(i => i.productId === ret.productId);
         if (itemLine) {
-          const discrepancy = itemLine.loadedQty - (itemLine.soldQty + returnQty);
+          const totalDispatched = itemLine.soldQty + (itemLine.freeQty || 0);
+          const discrepancy = itemLine.loadedQty - (totalDispatched + returnQty);
           await tx.lorryLoadingItem.update({
             where: { id: itemLine.id },
             data: {

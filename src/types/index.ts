@@ -38,6 +38,7 @@ export interface LorryLoadingItem {
   product: Product;
   loadedQty: number;
   soldQty: number;
+  freeQty: number;
   returnedQty: number;
   discrepancyQty: number;
 }
@@ -53,6 +54,7 @@ export interface LorryLoading {
   notes?: string | null;
   totalLoadedItems: number;
   totalSoldItems: number;
+  totalFreeItems: number;
   totalReturnedItems: number;
   totalSalesAmount: number;
   cashCollected: number;
@@ -72,6 +74,8 @@ export interface Product {
   costPrice: number;
   currentStock: number; // Main warehouse stock
   minStockAlert: number;
+  freeRatioBuy?: number;
+  freeRatioGet?: number;
   createdAt: string;
   updatedAt: string;
   lorryStocks?: {
@@ -107,6 +111,7 @@ export interface OrderItem {
   productId: string;
   product: Product;
   quantity: number;
+  freeQuantity: number;
   unitPrice: number;
   lineTotal: number;
 }

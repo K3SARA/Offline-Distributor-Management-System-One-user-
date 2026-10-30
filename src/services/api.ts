@@ -56,7 +56,7 @@ export const LorryService = {
   enterDriverBill: (id: string, payload: {
     paperBillNumber?: string;
     customerId: string;
-    items: { productId: string; quantity: number }[];
+    items: { productId: string; quantity: number; freeQuantity?: number }[];
     paymentMethod: 'CASH' | 'CREDIT' | 'CHEQUE';
     cashReceived: number;
     notes?: string;

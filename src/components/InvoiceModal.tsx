@@ -142,7 +142,14 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, onClose }) =>
                       <span className="text-[10px] sm:text-[11px] font-mono text-slate-400">{item.product.sku}</span>
                     </td>
                     <td className="p-2.5 sm:p-3 text-center text-xs text-slate-500">{item.product.unit}</td>
-                    <td className="p-2.5 sm:p-3 text-center font-bold text-slate-900">{item.quantity}</td>
+                    <td className="p-2.5 sm:p-3 text-center font-bold text-slate-900">
+                      {item.quantity}
+                      {item.freeQuantity > 0 && (
+                        <span className="block text-[10px] font-semibold text-emerald-600">
+                          +{item.freeQuantity} Free
+                        </span>
+                      )}
+                    </td>
                     <td className="p-2.5 sm:p-3 text-right font-mono text-slate-600">{formatMoney(item.unitPrice)}</td>
                     <td className="p-2.5 sm:p-3 pr-3 sm:pr-4 text-right font-bold text-slate-900 font-mono">
                       {formatMoney(item.lineTotal)}
@@ -160,6 +167,14 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, onClose }) =>
                 <span>Subtotal:</span>
                 <span className="font-medium text-slate-900 font-mono">{formatMoney(order.subtotal)}</span>
               </div>
+              {order.items.some(i => (i.freeQuantity || 0) > 0) && (
+                <div className="flex justify-between text-xs text-emerald-700 font-medium">
+                  <span>Promotional Units:</span>
+                  <span className="font-mono">
+                    {order.items.reduce((acc, i) => acc + (i.freeQuantity || 0), 0)} Free (Rs. 0)
+                  </span>
+                </div>
+              )}
               {order.discountAmount > 0 && (
                 <div className="flex justify-between text-emerald-600 font-medium">
                   <span>Tier Discount:</span>

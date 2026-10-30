@@ -20,6 +20,8 @@ model Product {
   costPrice      Float           // Purchase cost price
   currentStock   Int             @default(0)      // Warehouse main stock
   minStockAlert  Int             @default(10)
+  freeRatioBuy   Int             @default(0)      // Buy X (e.g. 10)
+  freeRatioGet   Int             @default(0)      // Get Y Free (e.g. 1)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
@@ -97,6 +99,7 @@ model LorryLoading {
   notes              String?
   totalLoadedItems   Int                @default(0)
   totalSoldItems     Int                @default(0)
+  totalFreeItems     Int                @default(0) // Promotional free units given
   totalReturnedItems Int                @default(0)
   totalSalesAmount   Float              @default(0.0)
   cashCollected      Float              @default(0.0)
@@ -116,8 +119,9 @@ model LorryLoadingItem {
   product        Product      @relation(fields: [productId], references: [id])
   loadedQty      Int          // Morning loaded qty
   soldQty        Int          @default(0) // Sum of sales recorded via paper bills
+  freeQty        Int          @default(0) // Free promotional units issued
   returnedQty    Int          @default(0) // Returned back to warehouse at settlement
-  discrepancyQty Int          @default(0) // Difference (loaded - sold - returned)
+  discrepancyQty Int          @default(0) // Difference (loaded - sold - free - returned)
 }
 
 // --------------------------------------------------------
@@ -176,12 +180,13 @@ model Order {
 }
 
 model OrderItem {
-  id         String   @id @default(uuid())
-  orderId    String
-  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId  String
-  product    Product  @relation(fields: [productId], references: [id])
-  quantity   Int
-  unitPrice  Float
-  lineTotal  Float
+  id           String   @id @default(uuid())
+  orderId      String
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id])
+  quantity     Int      // Billed / Paid quantity
+  freeQuantity Int      @default(0) // Free issues given on promotion
+  unitPrice    Float
+  lineTotal    Float
 }
