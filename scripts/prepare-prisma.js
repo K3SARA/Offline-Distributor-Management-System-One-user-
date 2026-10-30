@@ -6,50 +6,36 @@ const envPath = path.join(__dirname, '../.env');
 
 let schema = fs.readFileSync(schemaPath, 'utf8');
 
-const dbUrl = process.env.DATABASE_URL || '';
-const isRailway = Boolean(
-  process.env.RAILWAY_ENVIRONMENT ||
-  process.env.RAILWAY_PROJECT_ID ||
-  process.env.RAILWAY_STATIC_URL ||
-  process.env.RAILWAY_SERVICE_ID
-);
+// Check the actual DATABASE_URL environment variable
+const dbUrl = (process.env.DATABASE_URL || '').trim();
 
-// Determine if we should use PostgreSQL (Railway defaults to PostgreSQL)
-const isPostgres = dbUrl.startsWith('postgres://') || dbUrl.startsWith('postgresql://') || (isRailway && !dbUrl.startsWith('file:'));
+// Use PostgreSQL ONLY if an actual postgresql:// connection string is provided
+const isPostgres = dbUrl.startsWith('postgres://') || dbUrl.startsWith('postgresql://');
 
 if (isPostgres) {
-  console.log('[Prisma Prep] PostgreSQL detected / Railway environment. Setting provider = "postgresql"...');
+  console.log('[Prisma Prep] Real PostgreSQL DATABASE_URL detected. Configuring provider = "postgresql"...');
   schema = schema.replace(/provider\s*=\s*"sqlite"/g, 'provider = "postgresql"');
 } else {
-  console.log('[Prisma Prep] SQLite / local file detected. Setting provider = "sqlite"...');
+  console.log('[Prisma Prep] SQLite database selected (file:./distributor.db). Configuring provider = "sqlite"...');
   schema = schema.replace(/provider\s*=\s*"postgresql"/g, 'provider = "sqlite"');
 }
 
 fs.writeFileSync(schemaPath, schema, 'utf8');
-console.log('[Prisma Prep] prisma/schema.prisma updated.');
 
-// Ensure a valid DATABASE_URL exists during the build phase for Prisma schema validation
+// Ensure DATABASE_URL is set in .env if not provided in environment
 if (!process.env.DATABASE_URL) {
-  const fallbackUrl = isPostgres
-    ? 'postgresql://postgres:postgres@localhost:5432/railway?schema=public'
-    : 'file:./distributor.db';
-
-  console.log(`[Prisma Prep] No DATABASE_URL in environment. Ensuring fallback in .env for build phase: ${fallbackUrl}`);
-
   let envContent = '';
   if (fs.existsSync(envPath)) {
     envContent = fs.readFileSync(envPath, 'utf8');
   }
 
+  const sqliteUrl = 'file:./distributor.db';
   if (!envContent.includes('DATABASE_URL=')) {
-    fs.appendFileSync(envPath, `\nDATABASE_URL="${fallbackUrl}"\n`, 'utf8');
-  } else if (isPostgres && envContent.includes('file:')) {
-    envContent = envContent.replace(/DATABASE_URL=["'][^"']*["']/g, `DATABASE_URL="${fallbackUrl}"`);
-    fs.writeFileSync(envPath, envContent, 'utf8');
-  } else if (!isPostgres && envContent.includes('postgres')) {
-    envContent = envContent.replace(/DATABASE_URL=["'][^"']*["']/g, `DATABASE_URL="${fallbackUrl}"`);
+    fs.appendFileSync(envPath, `\nDATABASE_URL="${sqliteUrl}"\n`, 'utf8');
+  } else if (envContent.includes('postgres')) {
+    envContent = envContent.replace(/DATABASE_URL=["'][^"']*["']/g, `DATABASE_URL="${sqliteUrl}"`);
     fs.writeFileSync(envPath, envContent, 'utf8');
   }
 }
 
-console.log('[Prisma Prep] Configuration complete.');
+console.log('[Prisma Prep] Configuration ready.');

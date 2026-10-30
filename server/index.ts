@@ -632,6 +632,87 @@ if (fs.existsSync(distPath)) {
   });
 }
 
-app.listen(Number(PORT), HOST, () => {
+async function seedIfEmpty() {
+  try {
+    const count = await prisma.product.count();
+    if (count === 0) {
+      console.log('[Auto-Seed] Empty database detected. Seeding initial distribution catalog...');
+      await prisma.customer.createMany({
+        data: [
+          {
+            code: 'CUST-001',
+            name: 'Apex Supermart & Provisions',
+            companyName: 'Apex Retail Ltd',
+            phone: '+94 77 123 4567',
+            deliveryAddress: '448 Galle Road, Colombo 03',
+            city: 'Colombo',
+            pricingTier: 'WHOLESALE',
+            discountPercentage: 10.0,
+            creditLimit: 500000,
+            outstandingBalance: 42500.0
+          },
+          {
+            code: 'CUST-002',
+            name: 'Horizon Corner Grocers',
+            companyName: 'Horizon Stores',
+            phone: '+94 71 987 6543',
+            deliveryAddress: '12 Kandy Road',
+            city: 'Kadawatha',
+            pricingTier: 'STANDARD',
+            discountPercentage: 0.0,
+            creditLimit: 150000,
+            outstandingBalance: 12400.0
+          }
+        ]
+      });
+
+      const p1 = await prisma.product.create({
+        data: {
+          sku: 'BEV-001',
+          name: 'Ceylon Premium Black Tea (24x250g)',
+          category: 'Beverages',
+          unit: 'Case',
+          unitPrice: 7200.00,
+          costPrice: 5100.00,
+          currentStock: 85,
+          minStockAlert: 15
+        }
+      });
+
+      const p2 = await prisma.product.create({
+        data: {
+          sku: 'BEV-002',
+          name: 'Natural Mineral Spring Water (12x1.5L)',
+          category: 'Beverages',
+          unit: 'Case',
+          unitPrice: 2160.00,
+          costPrice: 1400.00,
+          currentStock: 8, // Low stock trigger
+          minStockAlert: 20
+        }
+      });
+
+      const p3 = await prisma.product.create({
+        data: {
+          sku: 'DRY-001',
+          name: 'Samba Rice Premium Quality (25kg Bag)',
+          category: 'Grains & Staples',
+          unit: 'Bag',
+          unitPrice: 6500.00,
+          costPrice: 5200.00,
+          currentStock: 120,
+          minStockAlert: 25
+        }
+      });
+
+      console.log('[Auto-Seed] Initial data seeded successfully.');
+    }
+  } catch (err) {
+    console.error('[Auto-Seed] Warning: auto-seed check skipped:', err);
+  }
+}
+
+app.listen(Number(PORT), HOST, async () => {
   console.log(`[Express Backend] Distributor Server active on http://${HOST}:${PORT}`);
+  await seedIfEmpty();
 });
