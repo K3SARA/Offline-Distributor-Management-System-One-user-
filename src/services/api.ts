@@ -99,16 +99,16 @@ export const OrderService = {
 };
 
 export const ReportService = {
-  getDashboardStats: () =>
-    api.get<DashboardStats>('/reports/dashboard-stats').then(r => r.data),
-  getLorryPerformance: () =>
-    api.get<LorryLoading[]>('/reports/lorry-performance').then(r => r.data),
-  getRouteSales: () =>
-    api.get<any[]>('/reports/route-sales').then(r => r.data),
+  getDashboardStats: (from?: string, to?: string) =>
+    api.get<DashboardStats>('/reports/dashboard-stats', { params: { from, to } }).then(r => r.data),
+  getLorryPerformance: (from?: string, to?: string) =>
+    api.get<LorryLoading[]>('/reports/lorry-performance', { params: { from, to } }).then(r => r.data),
+  getRouteSales: (from?: string, to?: string) =>
+    api.get<any[]>('/reports/route-sales', { params: { from, to } }).then(r => r.data),
   getSalesSummary: (from?: string, to?: string, lorryId?: string, routeId?: string) =>
     api.get<any>('/reports/sales-summary', { params: { from, to, lorryId, routeId } }).then(r => r.data),
-  getStockMovements: (type?: string, limit?: number) =>
-    api.get<StockMovement[]>('/reports/stock-movements', { params: { type, limit } }).then(r => r.data),
+  getStockMovements: (type?: string, limit?: number, from?: string, to?: string) =>
+    api.get<StockMovement[]>('/reports/stock-movements', { params: { type, limit, from, to } }).then(r => r.data),
   getCustomerBalances: () =>
     api.get<any>('/reports/customer-balances').then(r => r.data)
 };

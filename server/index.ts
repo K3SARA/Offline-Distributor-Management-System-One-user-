@@ -1093,16 +1093,23 @@ app.patch('/api/orders/:id/status', async (req: Request, res: Response) => {
 // 8. REPORTING & ANALYTICS (LORRY PERFORMANCE, ROUTES, CASH)
 // ========================================================
 
-// Dashboard statistics
-app.get('/api/reports/dashboard-stats', async (_req: Request, res: Response) => {
+// Dashboard statistics with date range support
+app.get('/api/reports/dashboard-stats', async (req: Request, res: Response) => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const { from, to } = req.query;
+    const startDate = from ? new Date(from as string) : new Date(new Date().setHours(0, 0, 0, 0));
+    const endDate = to ? new Date(to as string) : new Date(new Date().setHours(23, 59, 59, 999));
 
-    const [todayOrders, allProducts, customerBalances, lorries] = await Promise.all([
+    const [periodOrders, allProducts, customerBalances, lorries] = await Promise.all([
       prisma.order.findMany({
-        where: { createdAt: { gte: today } },
-        include: { customer: true, lorry: true, route: true }
+        where: {
+          createdAt: {
+            gte: startDate,
+            lte: endDate
+          }
+        },
+        include: { customer: true, lorry: true, route: true },
+        orderBy: { createdAt: 'desc' }
       }),
       prisma.product.findMany({
         include: { lorryStocks: true }
@@ -1115,7 +1122,12 @@ app.get('/api/reports/dashboard-stats', async (_req: Request, res: Response) => 
           route: true,
           lorryStocks: true,
           loadings: {
-            where: { createdAt: { gte: today } },
+            where: {
+              date: {
+                gte: startDate,
+                lte: endDate
+              }
+            },
             include: { items: true }
           }
         }
@@ -1123,7 +1135,7 @@ app.get('/api/reports/dashboard-stats', async (_req: Request, res: Response) => 
     ]);
 
     const lowStockProducts = allProducts.filter(p => p.currentStock <= p.minStockAlert);
-    const validOrders = todayOrders.filter(o => o.status !== 'CANCELLED');
+    const validOrders = periodOrders.filter(o => o.status !== 'CANCELLED');
     const revenueToday = validOrders.reduce((acc, order) => acc + order.netTotal, 0);
     const cashToday = validOrders.reduce((acc, order) => acc + order.cashReceived, 0);
     const creditToday = revenueToday - cashToday;
@@ -1152,24 +1164,38 @@ app.get('/api/reports/dashboard-stats', async (_req: Request, res: Response) => 
       lowStockCount: lowStockProducts.length,
       totalOutstanding: customerBalances._sum.outstandingBalance || 0,
       fleetStatus,
-      recentOrders: todayOrders.slice(0, 10),
-      lowStockItems: lowStockProducts.slice(0, 5)
+      recentOrders: periodOrders.slice(0, 15),
+      lowStockItems: lowStockProducts.slice(0, 5),
+      period: {
+        from: startDate.toISOString(),
+        to: endDate.toISOString()
+      }
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Lorry Performance & Settlement Report
-app.get('/api/reports/lorry-performance', async (_req: Request, res: Response) => {
+// Lorry Performance & Settlement Report with date filtering
+app.get('/api/reports/lorry-performance', async (req: Request, res: Response) => {
   try {
+    const { from, to } = req.query;
+    const where: any = {};
+    if (from || to) {
+      where.date = {
+        gte: from ? new Date(from as string) : undefined,
+        lte: to ? new Date(to as string) : undefined
+      };
+    }
+
     const loadings = await prisma.lorryLoading.findMany({
+      where,
       include: {
         lorry: { include: { route: true } },
         items: { include: { product: true } }
       },
       orderBy: { createdAt: 'desc' },
-      take: 50
+      take: 100
     });
 
     res.json(loadings);
@@ -1178,15 +1204,24 @@ app.get('/api/reports/lorry-performance', async (_req: Request, res: Response) =
   }
 });
 
-// Sales summary by route
-app.get('/api/reports/route-sales', async (_req: Request, res: Response) => {
+// Sales summary by route with date filtering
+app.get('/api/reports/route-sales', async (req: Request, res: Response) => {
   try {
+    const { from, to } = req.query;
+    const orderWhere: any = { status: { not: 'CANCELLED' } };
+    if (from || to) {
+      orderWhere.createdAt = {
+        gte: from ? new Date(from as string) : undefined,
+        lte: to ? new Date(to as string) : undefined
+      };
+    }
+
     const routes = await prisma.route.findMany({
       include: {
         lorries: true,
         customers: true,
         orders: {
-          where: { status: { not: 'CANCELLED' } },
+          where: orderWhere,
           include: { items: true }
         }
       }
@@ -1223,7 +1258,7 @@ app.get('/api/reports/sales-summary', async (req: Request, res: Response) => {
   try {
     const { from, to, lorryId, routeId } = req.query;
     const startDate = from ? new Date(from as string) : new Date(new Date().setHours(0, 0, 0, 0));
-    const endDate = to ? new Date(to as string) : new Date();
+    const endDate = to ? new Date(to as string) : new Date(new Date().setHours(23, 59, 59, 999));
 
     const where: any = {
       createdAt: {
@@ -1272,13 +1307,19 @@ app.get('/api/reports/sales-summary', async (req: Request, res: Response) => {
   }
 });
 
-// Stock movement history
+// Stock movement history with date filtering
 app.get('/api/reports/stock-movements', async (req: Request, res: Response) => {
   try {
-    const { type, limit } = req.query;
+    const { type, limit, from, to } = req.query;
     const where: any = {};
     if (type && typeof type === 'string' && type !== 'ALL') {
       where.type = type;
+    }
+    if (from || to) {
+      where.createdAt = {
+        gte: from ? new Date(from as string) : undefined,
+        lte: to ? new Date(to as string) : undefined
+      };
     }
 
     const movements = await prisma.stockMovement.findMany({

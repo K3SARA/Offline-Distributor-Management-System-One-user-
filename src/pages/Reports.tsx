@@ -16,11 +16,16 @@ import {
 import { ReportService } from '../services/api';
 import { StockMovement, Customer, LorryLoading } from '../types';
 import { useCurrency } from '../context/CurrencyContext';
+import { DateRangeFilter, DatePreset } from '../components/DateRangeFilter';
 
 export const Reports: React.FC = () => {
   const { formatMoney } = useCurrency();
   const [activeTab, setActiveTab] = useState<'LORRIES' | 'ROUTES' | 'SALES' | 'STOCK' | 'BALANCES'>('LORRIES');
   const [loading, setLoading] = useState(false);
+
+  // Date filter state
+  const [datePreset, setDatePreset] = useState<DatePreset>('today');
+  const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
 
   // Data
   const [lorryLoadings, setLorryLoadings] = useState<LorryLoading[]>([]);
@@ -31,22 +36,22 @@ export const Reports: React.FC = () => {
 
   useEffect(() => {
     loadActiveReport();
-  }, [activeTab]);
+  }, [activeTab, dateRange]);
 
   const loadActiveReport = async () => {
     setLoading(true);
     try {
       if (activeTab === 'LORRIES') {
-        const data = await ReportService.getLorryPerformance();
+        const data = await ReportService.getLorryPerformance(dateRange.from, dateRange.to);
         setLorryLoadings(data);
       } else if (activeTab === 'ROUTES') {
-        const data = await ReportService.getRouteSales();
+        const data = await ReportService.getRouteSales(dateRange.from, dateRange.to);
         setRouteSummaries(data);
       } else if (activeTab === 'SALES') {
-        const data = await ReportService.getSalesSummary();
+        const data = await ReportService.getSalesSummary(dateRange.from, dateRange.to);
         setSalesData(data);
       } else if (activeTab === 'STOCK') {
-        const movements = await ReportService.getStockMovements();
+        const movements = await ReportService.getStockMovements(undefined, 100, dateRange.from, dateRange.to);
         setStockMovements(movements);
       } else if (activeTab === 'BALANCES') {
         const balances = await ReportService.getCustomerBalances();
@@ -56,6 +61,28 @@ export const Reports: React.FC = () => {
       console.error('Failed to load report data', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDateRangeChange = (range: { from: string; to: string; preset: DatePreset }) => {
+    setDatePreset(range.preset);
+    setDateRange({ from: range.from, to: range.to });
+  };
+
+  const getPresetLabel = () => {
+    switch (datePreset) {
+      case 'today':
+        return 'Today';
+      case 'yesterday':
+        return 'Yesterday';
+      case 'thisWeek':
+        return 'This Week';
+      case 'thisMonth':
+        return 'This Month';
+      case 'custom':
+        return 'Custom Date Range';
+      default:
+        return 'Period';
     }
   };
 
@@ -103,7 +130,7 @@ export const Reports: React.FC = () => {
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 overflow-y-auto h-full">
+    <div className="p-8 max-w-7xl mx-auto space-y-7 overflow-y-auto h-full">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/80 pb-6 print:hidden">
         <div>
@@ -131,43 +158,54 @@ export const Reports: React.FC = () => {
         </div>
       </div>
 
-      {/* Report Tabs */}
-      <div className="flex gap-2 bg-slate-200/60 p-1.5 rounded-2xl w-fit print:hidden flex-wrap">
-        <button
-          onClick={() => setActiveTab('LORRIES')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition ${activeTab === 'LORRIES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-            }`}
-        >
-          <Truck className="w-4 h-4 text-blue-600" /> Lorry Settlement Audit
-        </button>
-        <button
-          onClick={() => setActiveTab('ROUTES')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition ${activeTab === 'ROUTES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-            }`}
-        >
-          <Compass className="w-4 h-4 text-emerald-600" /> Route Sales Breakdown
-        </button>
-        <button
-          onClick={() => setActiveTab('SALES')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition ${activeTab === 'SALES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-            }`}
-        >
-          <DollarSign className="w-4 h-4 text-amber-600" /> Driver Bills Summary
-        </button>
-        <button
-          onClick={() => setActiveTab('STOCK')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition ${activeTab === 'STOCK' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-            }`}
-        >
-          <Boxes className="w-4 h-4 text-indigo-600" /> Warehouse Movements
-        </button>
-        <button
-          onClick={() => setActiveTab('BALANCES')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition ${activeTab === 'BALANCES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-            }`}
-        >
-          <Users className="w-4 h-4 text-purple-600" /> Customer Receivables
-        </button>
+      {/* Toolbar: Report Tabs & Date Range Filter Bar */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 print:hidden">
+        {/* Report Tabs */}
+        <div className="flex gap-1.5 bg-slate-200/60 p-1.5 rounded-2xl w-fit flex-wrap">
+          <button
+            onClick={() => setActiveTab('LORRIES')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition ${activeTab === 'LORRIES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+          >
+            <Truck className="w-3.5 h-3.5 text-blue-600" /> Lorry Settlement Audit
+          </button>
+          <button
+            onClick={() => setActiveTab('ROUTES')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition ${activeTab === 'ROUTES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+          >
+            <Compass className="w-3.5 h-3.5 text-emerald-600" /> Route Analysis
+          </button>
+          <button
+            onClick={() => setActiveTab('SALES')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition ${activeTab === 'SALES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+          >
+            <DollarSign className="w-3.5 h-3.5 text-amber-600" /> Driver Bills
+          </button>
+          <button
+            onClick={() => setActiveTab('STOCK')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition ${activeTab === 'STOCK' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+          >
+            <Boxes className="w-3.5 h-3.5 text-indigo-600" /> Stock Movements
+          </button>
+          <button
+            onClick={() => setActiveTab('BALANCES')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition ${activeTab === 'BALANCES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+          >
+            <Users className="w-3.5 h-3.5 text-purple-600" /> Receivables
+          </button>
+        </div>
+
+        {/* Date Filter (Not applicable to static balances) */}
+        {activeTab !== 'BALANCES' && (
+          <DateRangeFilter
+            initialPreset="today"
+            onRangeChange={handleDateRangeChange}
+          />
+        )}
       </div>
 
       {/* REPORT CONTENT AREA */}
@@ -183,9 +221,11 @@ export const Reports: React.FC = () => {
                 {activeTab === 'STOCK' && 'Central Warehouse Stock Movements (Inbounds, Loads, Returns)'}
                 {activeTab === 'BALANCES' && 'Route Retail Customer Credit Statements'}
               </h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Generated: {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
-              </p>
+              <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
+                <span>Filter: <strong>{getPresetLabel()}</strong></span>
+                <span>•</span>
+                <span>Generated: {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -213,7 +253,7 @@ export const Reports: React.FC = () => {
                   {lorryLoadings.length === 0 ? (
                     <tr>
                       <td colSpan={10} className="p-8 text-center text-slate-400">
-                        No lorry loadings recorded yet.
+                        No lorry loadings recorded for {getPresetLabel().toLowerCase()}.
                       </td>
                     </tr>
                   ) : (
@@ -270,7 +310,7 @@ export const Reports: React.FC = () => {
                   </div>
                   <div className="pt-2 border-t border-slate-200/70 grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <span className="text-[10px] text-slate-400 block uppercase font-bold">Total Sales</span>
+                      <span className="text-[10px] text-slate-400 block uppercase font-bold">Period Sales</span>
                       <span className="font-mono font-bold text-slate-900">{formatMoney(route.totalSales)}</span>
                     </div>
                     <div>
@@ -290,7 +330,7 @@ export const Reports: React.FC = () => {
             <div className="grid grid-cols-3 gap-6 bg-slate-50/70 p-6 rounded-2xl border border-slate-100">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                  Total Bills
+                  Total Bills ({getPresetLabel()})
                 </span>
                 <span className="text-2xl font-bold text-slate-900">{salesData.ordersCount}</span>
               </div>
@@ -323,22 +363,30 @@ export const Reports: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {salesData.orders.map((o: any) => (
-                    <tr key={o.id} className="hover:bg-slate-50/50">
-                      <td className="p-3 font-mono font-bold text-slate-800">{o.orderNumber}</td>
-                      <td className="p-3 font-mono font-semibold text-blue-600">{o.paperBillNumber || '—'}</td>
-                      <td className="p-3 text-slate-600">{o.lorry?.vehicleNumber || 'Warehouse'}</td>
-                      <td className="p-3 font-medium text-slate-900">{o.customer.name}</td>
-                      <td className="p-3 text-right font-mono text-slate-600">{formatMoney(o.subtotal)}</td>
-                      <td className="p-3 text-right font-mono font-bold text-slate-900">{formatMoney(o.netTotal)}</td>
-                      <td className="p-3 text-right font-mono font-semibold text-emerald-600">{formatMoney(o.cashReceived)}</td>
-                      <td className="p-3 text-center">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700">
-                          {o.paymentMethod} • {o.paymentStatus}
-                        </span>
+                  {salesData.orders.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="p-8 text-center text-slate-400">
+                        No sales bills found for {getPresetLabel().toLowerCase()}.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    salesData.orders.map((o: any) => (
+                      <tr key={o.id} className="hover:bg-slate-50/50">
+                        <td className="p-3 font-mono font-bold text-slate-800">{o.orderNumber}</td>
+                        <td className="p-3 font-mono font-semibold text-blue-600">{o.paperBillNumber || '—'}</td>
+                        <td className="p-3 text-slate-600">{o.lorry?.vehicleNumber || 'Warehouse'}</td>
+                        <td className="p-3 font-medium text-slate-900">{o.customer.name}</td>
+                        <td className="p-3 text-right font-mono text-slate-600">{formatMoney(o.subtotal)}</td>
+                        <td className="p-3 text-right font-mono font-bold text-slate-900">{formatMoney(o.netTotal)}</td>
+                        <td className="p-3 text-right font-mono font-semibold text-emerald-600">{formatMoney(o.cashReceived)}</td>
+                        <td className="p-3 text-center">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700">
+                            {o.paymentMethod} • {o.paymentStatus}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -361,35 +409,43 @@ export const Reports: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {stockMovements.map((m) => (
-                  <tr key={m.id} className="hover:bg-slate-50/50">
-                    <td className="p-3 text-slate-500 font-mono">
-                      {new Date(m.createdAt).toLocaleDateString()} {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {stockMovements.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-slate-400">
+                      No stock movements recorded for {getPresetLabel().toLowerCase()}.
                     </td>
-                    <td className="p-3 font-mono font-bold text-slate-900">{m.product.sku}</td>
-                    <td className="p-3 font-semibold text-slate-900">{m.product.name}</td>
-                    <td className="p-3">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${m.type === 'INBOUND' || m.type === 'LORRY_RETURN'
-                            ? 'bg-emerald-50 text-emerald-700'
-                            : m.type === 'LORRY_LOAD' || m.type === 'OUTBOUND'
-                              ? 'bg-blue-50 text-blue-700'
-                              : 'bg-amber-50 text-amber-700'
-                          }`}
-                      >
-                        {m.type === 'INBOUND' && <ArrowDownRight className="w-3 h-3" />}
-                        {m.type === 'LORRY_RETURN' && <RotateCcw className="w-3 h-3" />}
-                        {m.type === 'LORRY_LOAD' && <Truck className="w-3 h-3" />}
-                        {m.type}
-                      </span>
-                    </td>
-                    <td className={`p-3 text-right font-mono font-bold ${m.quantity > 0 ? 'text-emerald-700' : 'text-slate-800'}`}>
-                      {m.quantity > 0 ? `+${m.quantity}` : m.quantity}
-                    </td>
-                    <td className="p-3 font-mono text-slate-600">{m.referenceId || '—'}</td>
-                    <td className="p-3 text-slate-500">{m.notes || '—'}</td>
                   </tr>
-                ))}
+                ) : (
+                  stockMovements.map((m) => (
+                    <tr key={m.id} className="hover:bg-slate-50/50">
+                      <td className="p-3 text-slate-500 font-mono">
+                        {new Date(m.createdAt).toLocaleDateString()} {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td className="p-3 font-mono font-bold text-slate-900">{m.product.sku}</td>
+                      <td className="p-3 font-semibold text-slate-900">{m.product.name}</td>
+                      <td className="p-3">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${m.type === 'INBOUND' || m.type === 'LORRY_RETURN'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : m.type === 'LORRY_LOAD' || m.type === 'OUTBOUND'
+                                ? 'bg-blue-50 text-blue-700'
+                                : 'bg-amber-50 text-amber-700'
+                            }`}
+                        >
+                          {m.type === 'INBOUND' && <ArrowDownRight className="w-3 h-3" />}
+                          {m.type === 'LORRY_RETURN' && <RotateCcw className="w-3 h-3" />}
+                          {m.type === 'LORRY_LOAD' && <Truck className="w-3 h-3" />}
+                          {m.type}
+                        </span>
+                      </td>
+                      <td className={`p-3 text-right font-mono font-bold ${m.quantity > 0 ? 'text-emerald-700' : 'text-slate-800'}`}>
+                        {m.quantity > 0 ? `+${m.quantity}` : m.quantity}
+                      </td>
+                      <td className="p-3 font-mono text-slate-600">{m.referenceId || '—'}</td>
+                      <td className="p-3 text-slate-500">{m.notes || '—'}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
