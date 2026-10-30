@@ -8,7 +8,7 @@ generator client {
 }
 
 // --------------------------------------------------------
-// 1. PRODUCTS & INVENTORY
+// 1. PRODUCTS & MAIN WAREHOUSE INVENTORY
 // --------------------------------------------------------
 model Product {
   id             String          @id @default(uuid())
@@ -18,13 +18,15 @@ model Product {
   unit           String          @default("Unit") // e.g., Case, Box, Pack, Kg
   unitPrice      Float           // Base selling price
   costPrice      Float           // Purchase cost price
-  currentStock   Int             @default(0)
+  currentStock   Int             @default(0)      // Warehouse main stock
   minStockAlert  Int             @default(10)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
   orderItems     OrderItem[]
   stockMovements StockMovement[]
+  lorryStocks    LorryStock[]
+  loadingItems   LorryLoadingItem[]
 
   @@index([sku])
   @@index([name])
@@ -34,9 +36,9 @@ model StockMovement {
   id          String   @id @default(uuid())
   productId   String
   product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  type        String   // INBOUND, OUTBOUND, ADJUSTMENT, RETURN
-  quantity    Int      // Positive for Inbound/Return, Negative or recorded as dispatched count
-  referenceId String?  // Linked Order ID or Supplier Invoice #
+  type        String   // INBOUND, LORRY_LOAD, LORRY_RETURN, ADJUSTMENT, RETURN
+  quantity    Int      // Movement count
+  referenceId String?  // Linked Order ID, Loading ID, or Supplier Invoice #
   notes       String?
   createdAt   DateTime @default(now())
 
@@ -45,7 +47,101 @@ model StockMovement {
 }
 
 // --------------------------------------------------------
-// 2. CUSTOMERS & CLIENTS
+// 2. ROUTES & 3 LORRIES FLEET
+// --------------------------------------------------------
+model Route {
+  id          String     @id @default(uuid())
+  code        String     @unique // e.g. "R-01", "R-02", "R-03"
+  name        String     // e.g. "Route 1 - Colombo South"
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  lorries     Lorry[]
+  customers   Customer[]
+  orders      Order[]
+
+  @@index([code])
+}
+
+model Lorry {
+  id            String         @id @default(uuid())
+  vehicleNumber String         @unique // e.g. "WP-DA-1024"
+  driverName    String         // e.g. "Sunil Perera"
+  driverPhone   String?
+  routeId       String?
+  route         Route?         @relation(fields: [routeId], references: [id])
+  status        String         @default("ACTIVE") // ACTIVE, MAINTENANCE
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  loadings      LorryLoading[]
+  lorryStocks   LorryStock[]
+  orders        Order[]
+
+  @@index([vehicleNumber])
+  @@index([routeId])
+}
+
+// Real-time floating inventory held on each lorry
+model LorryStock {
+  id        String   @id @default(uuid())
+  lorryId   String
+  lorry     Lorry    @relation(fields: [lorryId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([lorryId, productId])
+  @@index([lorryId])
+  @@index([productId])
+}
+
+// Morning loading & Evening settlement ledger
+model LorryLoading {
+  id                 String             @id @default(uuid())
+  loadingNumber      String             @unique // e.g. "LOAD-20261030-001"
+  lorryId            String
+  lorry              Lorry              @relation(fields: [lorryId], references: [id])
+  routeId            String?
+  date               DateTime           @default(now())
+  status             String             @default("LOADED") // LOADED, IN_TRANSIT, SETTLED
+  notes              String?
+  totalLoadedItems   Int                @default(0)
+  totalSoldItems     Int                @default(0)
+  totalReturnedItems Int                @default(0)
+  totalSalesAmount   Float              @default(0.0)
+  cashCollected      Float              @default(0.0)
+  creditGiven        Float              @default(0.0)
+  settledAt          DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  items              LorryLoadingItem[]
+
+  @@index([lorryId])
+  @@index([date])
+  @@index([status])
+}
+
+model LorryLoadingItem {
+  id             String       @id @default(uuid())
+  loadingId      String
+  loading        LorryLoading @relation(fields: [loadingId], references: [id], onDelete: Cascade)
+  productId      String
+  product        Product      @relation(fields: [productId], references: [id])
+  loadedQty      Int          // Morning loaded qty
+  soldQty        Int          @default(0) // Sum of sales recorded via paper bills
+  returnedQty    Int          @default(0) // Returned back to warehouse at settlement
+  discrepancyQty Int          @default(0) // Difference (loaded - sold - returned)
+
+  @@index([loadingId])
+  @@index([productId])
+}
+
+// --------------------------------------------------------
+// 3. CUSTOMERS & CLIENTS
 // --------------------------------------------------------
 model Customer {
   id                 String   @id @default(uuid())
@@ -55,9 +151,11 @@ model Customer {
   phone              String
   deliveryAddress    String
   city               String   @default("Local")
+  routeId            String?
+  route              Route?   @relation(fields: [routeId], references: [id])
   pricingTier        String   @default("STANDARD") // STANDARD, WHOLESALE, VIP
   discountPercentage Float    @default(0.0) // Flat discount %
-  creditLimit        Float    @default(5000.0)
+  creditLimit        Float    @default(50000.0)
   outstandingBalance Float    @default(0.0) // Current credit balance
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
@@ -67,33 +165,43 @@ model Customer {
   @@index([code])
   @@index([phone])
   @@index([name])
+  @@index([routeId])
 }
 
 // --------------------------------------------------------
-// 3. ORDERS & DISTRIBUTION WORKFLOW
+// 4. ORDERS & EVENING OFFICE BILL ENTRY
 // --------------------------------------------------------
 model Order {
   id              String      @id @default(uuid())
   orderNumber     String      @unique // e.g. "ORD-20261030-0001"
+  paperBillNumber String?     // Physical paper bill slip number brought by driver
   customerId      String
   customer        Customer    @relation(fields: [customerId], references: [id])
-  status          String      @default("PENDING") // PENDING, DISPATCHED, DELIVERED, CANCELLED
-  paymentStatus   String      @default("UNPAID") // UNPAID, PARTIAL, PAID
+  lorryId         String?
+  lorry           Lorry?      @relation(fields: [lorryId], references: [id])
+  routeId         String?
+  route           Route?      @relation(fields: [routeId], references: [id])
+  status          String      @default("DELIVERED") // PENDING, DELIVERED, CANCELLED
+  paymentStatus   String      @default("PAID") // UNPAID, PARTIAL, PAID
+  paymentMethod   String      @default("CASH") // CASH, CREDIT, CHEQUE
   
   subtotal        Float
   discountAmount  Float       @default(0.0)
   taxAmount       Float       @default(0.0)
   netTotal        Float
+  cashReceived    Float       @default(0.0)
 
   notes           String?
   dispatchedAt    DateTime?
-  deliveredAt     DateTime?
+  deliveredAt     DateTime?   @default(now())
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
   items           OrderItem[]
 
   @@index([customerId])
+  @@index([lorryId])
+  @@index([routeId])
   @@index([createdAt])
   @@index([status])
 }

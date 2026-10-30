@@ -1,5 +1,14 @@
 import axios from 'axios';
-import { Product, Customer, Order, DashboardStats, StockMovement } from '../types';
+import {
+  Product,
+  Customer,
+  Order,
+  DashboardStats,
+  StockMovement,
+  Route,
+  Lorry,
+  LorryLoading
+} from '../types';
 
 // Dynamic API URL: uses relative '/api' on Railway / production web,
 // or fallback to localhost:4812 in standalone Vite dev / Electron
@@ -26,9 +35,43 @@ export const ProductService = {
     api.post<Product>(`/products/${id}/stock-adjust`, payload).then(r => r.data)
 };
 
+export const RouteService = {
+  getAll: () =>
+    api.get<Route[]>('/routes').then(r => r.data),
+  create: (data: { code: string; name: string; description?: string }) =>
+    api.post<Route>('/routes', data).then(r => r.data)
+};
+
+export const LorryService = {
+  getAll: () =>
+    api.get<Lorry[]>('/lorries').then(r => r.data),
+  getById: (id: string) =>
+    api.get<Lorry>(`/lorries/${id}`).then(r => r.data),
+  update: (id: string, data: Partial<Lorry>) =>
+    api.put<Lorry>(`/lorries/${id}`, data).then(r => r.data),
+  loadMorningStock: (id: string, payload: { items: { productId: string; quantity: number }[]; notes?: string }) =>
+    api.post<LorryLoading>(`/lorries/${id}/load`, payload).then(r => r.data),
+  getCurrentLoading: (id: string) =>
+    api.get<LorryLoading | null>(`/lorries/${id}/current-loading`).then(r => r.data),
+  enterDriverBill: (id: string, payload: {
+    paperBillNumber?: string;
+    customerId: string;
+    items: { productId: string; quantity: number }[];
+    paymentMethod: 'CASH' | 'CREDIT' | 'CHEQUE';
+    cashReceived: number;
+    notes?: string;
+  }) => api.post<Order>(`/lorries/${id}/bills`, payload).then(r => r.data),
+  settleLorry: (id: string, payload: {
+    loadingId: string;
+    returns: { productId: string; returnedQty: number }[];
+    cashHandover: number;
+    notes?: string;
+  }) => api.post<LorryLoading>(`/lorries/${id}/settle`, payload).then(r => r.data)
+};
+
 export const CustomerService = {
-  getAll: (search?: string) =>
-    api.get<Customer[]>('/customers', { params: { search } }).then(r => r.data),
+  getAll: (search?: string, routeId?: string) =>
+    api.get<Customer[]>('/customers', { params: { search, routeId } }).then(r => r.data),
   create: (data: Partial<Customer>) =>
     api.post<Customer>('/customers', data).then(r => r.data),
   update: (id: string, data: Partial<Customer>) =>
@@ -38,12 +81,19 @@ export const CustomerService = {
 };
 
 export const OrderService = {
-  getAll: (status?: string, limit?: number) =>
-    api.get<Order[]>('/orders', { params: { status, limit } }).then(r => r.data),
+  getAll: (status?: string, lorryId?: string, routeId?: string, limit?: number) =>
+    api.get<Order[]>('/orders', { params: { status, lorryId, routeId, limit } }).then(r => r.data),
   getById: (id: string) =>
     api.get<Order>(`/orders/${id}`).then(r => r.data),
-  create: (payload: { customerId: string; items: { productId: string; quantity: number }[]; paymentStatus?: string; notes?: string }) =>
-    api.post<Order>('/orders', payload).then(r => r.data),
+  create: (payload: {
+    customerId: string;
+    items: { productId: string; quantity: number }[];
+    paymentStatus?: string;
+    paymentMethod?: string;
+    cashReceived?: number;
+    notes?: string;
+    lorryId?: string;
+  }) => api.post<Order>('/orders', payload).then(r => r.data),
   updateStatus: (id: string, status: string) =>
     api.patch<Order>(`/orders/${id}/status`, { status }).then(r => r.data)
 };
@@ -51,8 +101,12 @@ export const OrderService = {
 export const ReportService = {
   getDashboardStats: () =>
     api.get<DashboardStats>('/reports/dashboard-stats').then(r => r.data),
-  getSalesSummary: (from?: string, to?: string) =>
-    api.get<any>('/reports/sales-summary', { params: { from, to } }).then(r => r.data),
+  getLorryPerformance: () =>
+    api.get<LorryLoading[]>('/reports/lorry-performance').then(r => r.data),
+  getRouteSales: () =>
+    api.get<any[]>('/reports/route-sales').then(r => r.data),
+  getSalesSummary: (from?: string, to?: string, lorryId?: string, routeId?: string) =>
+    api.get<any>('/reports/sales-summary', { params: { from, to, lorryId, routeId } }).then(r => r.data),
   getStockMovements: (type?: string, limit?: number) =>
     api.get<StockMovement[]>('/reports/stock-movements', { params: { type, limit } }).then(r => r.data),
   getCustomerBalances: () =>

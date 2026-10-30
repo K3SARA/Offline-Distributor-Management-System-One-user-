@@ -1,31 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Download, 
-  Printer, 
-  FileText, 
-  ArrowDownRight, 
-  ArrowUpRight, 
-  DollarSign, 
+import {
+  Download,
+  Printer,
+  FileText,
+  ArrowDownRight,
+  ArrowUpRight,
+  DollarSign,
   Calendar,
   Users,
-  Boxes
+  Boxes,
+  Truck,
+  Compass,
+  RotateCcw
 } from 'lucide-react';
 import { ReportService } from '../services/api';
-import { StockMovement, Customer } from '../types';
+import { StockMovement, Customer, LorryLoading } from '../types';
 import { useCurrency } from '../context/CurrencyContext';
 
 export const Reports: React.FC = () => {
-  const { formatCurrency } = useCurrency();
-  const [activeTab, setActiveTab] = useState<'SALES' | 'STOCK' | 'BALANCES'>('SALES');
+  const { formatMoney } = useCurrency();
+  const [activeTab, setActiveTab] = useState<'LORRIES' | 'ROUTES' | 'SALES' | 'STOCK' | 'BALANCES'>('LORRIES');
   const [loading, setLoading] = useState(false);
 
-  // Sales summary data
+  // Data
+  const [lorryLoadings, setLorryLoadings] = useState<LorryLoading[]>([]);
+  const [routeSummaries, setRouteSummaries] = useState<any[]>([]);
   const [salesData, setSalesData] = useState<any>(null);
-
-  // Stock movement logs
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
-
-  // Customer balances
   const [balancesData, setBalancesData] = useState<any>(null);
 
   useEffect(() => {
@@ -35,7 +36,13 @@ export const Reports: React.FC = () => {
   const loadActiveReport = async () => {
     setLoading(true);
     try {
-      if (activeTab === 'SALES') {
+      if (activeTab === 'LORRIES') {
+        const data = await ReportService.getLorryPerformance();
+        setLorryLoadings(data);
+      } else if (activeTab === 'ROUTES') {
+        const data = await ReportService.getRouteSales();
+        setRouteSummaries(data);
+      } else if (activeTab === 'SALES') {
         const data = await ReportService.getSalesSummary();
         setSalesData(data);
       } else if (activeTab === 'STOCK') {
@@ -55,10 +62,20 @@ export const Reports: React.FC = () => {
   const exportCSV = () => {
     let csvContent = 'data:text/csv;charset=utf-8,';
 
-    if (activeTab === 'SALES' && salesData?.orders) {
-      csvContent += 'Order Number,Date,Client,Subtotal,Discount,Net Total,Status\n';
+    if (activeTab === 'LORRIES') {
+      csvContent += 'Loading Number,Date,Lorry,Driver,Route,Status,Loaded Units,Sold Units,Returned Units,Sales Amount,Cash Collected\n';
+      lorryLoadings.forEach((l) => {
+        csvContent += `"${l.loadingNumber}","${new Date(l.date).toLocaleDateString()}","${l.lorry.vehicleNumber}","${l.lorry.driverName}","${l.lorry.route?.name || ''}","${l.status}",${l.totalLoadedItems},${l.totalSoldItems},${l.totalReturnedItems},${l.totalSalesAmount},${l.cashCollected}\n`;
+      });
+    } else if (activeTab === 'ROUTES') {
+      csvContent += 'Route Code,Route Name,Driver / Lorry,Customers,Total Bills,Total Sales,Cash Collected,Credit Given\n';
+      routeSummaries.forEach((r) => {
+        csvContent += `"${r.code}","${r.name}","${r.lorry?.vehicleNumber || ''}",${r.customerCount},${r.totalBills},${r.totalSales},${r.totalCash},${r.totalCredit}\n`;
+      });
+    } else if (activeTab === 'SALES' && salesData?.orders) {
+      csvContent += 'Bill Number,Paper Slip,Date,Client,Lorry,Subtotal,Discount,Net Total,Status\n';
       salesData.orders.forEach((o: any) => {
-        csvContent += `"${o.orderNumber}","${new Date(o.createdAt).toLocaleDateString()}","${o.customer.name}",${o.subtotal},${o.discountAmount},${o.netTotal},"${o.status}"\n`;
+        csvContent += `"${o.orderNumber}","${o.paperBillNumber || ''}","${new Date(o.createdAt).toLocaleDateString()}","${o.customer.name}","${o.lorry?.vehicleNumber || 'Warehouse'}",${o.subtotal},${o.discountAmount},${o.netTotal},"${o.status}"\n`;
       });
     } else if (activeTab === 'STOCK') {
       csvContent += 'Date,SKU,Product Name,Type,Quantity,Reference ID,Notes\n';
@@ -90,24 +107,24 @@ export const Reports: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/80 pb-6 print:hidden">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-[#1D1D1F]">
-            Reports & Audit Logs
+          <h1 className="text-3xl font-bold tracking-tight text-[#1D1D1F]">
+            Reports & Fleet Audit
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            End-of-day sales, warehouse stock movements, and customer outstanding statements
+            Reconciliation sheets for 3 lorries, route analysis, driver bills, and warehouse stock flow.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <button
             onClick={exportCSV}
-            className="px-5 py-3 bg-white border border-slate-200/80 hover:bg-slate-50 text-slate-700 font-semibold rounded-2xl shadow-sm transition text-sm flex items-center gap-2"
+            className="px-4 py-2.5 bg-white border border-slate-200/80 hover:bg-slate-50 text-slate-700 font-semibold rounded-2xl shadow-2xs transition text-xs flex items-center gap-2"
           >
             <Download className="w-4 h-4" /> Export CSV
           </button>
           <button
             onClick={handlePrint}
-            className="px-5 py-3 bg-[#0071E3] hover:bg-[#0077ED] text-white font-semibold rounded-2xl shadow-sm transition text-sm flex items-center gap-2"
+            className="px-4 py-2.5 bg-[#0071E3] hover:bg-blue-600 text-white font-semibold rounded-2xl shadow-sm transition text-xs flex items-center gap-2"
           >
             <Printer className="w-4 h-4" /> Print Report
           </button>
@@ -115,43 +132,56 @@ export const Reports: React.FC = () => {
       </div>
 
       {/* Report Tabs */}
-      <div className="flex gap-2 bg-slate-200/60 p-1.5 rounded-2xl w-fit print:hidden">
+      <div className="flex gap-2 bg-slate-200/60 p-1.5 rounded-2xl w-fit print:hidden flex-wrap">
+        <button
+          onClick={() => setActiveTab('LORRIES')}
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition ${activeTab === 'LORRIES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+        >
+          <Truck className="w-4 h-4 text-blue-600" /> Lorry Settlement Audit
+        </button>
+        <button
+          onClick={() => setActiveTab('ROUTES')}
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition ${activeTab === 'ROUTES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+        >
+          <Compass className="w-4 h-4 text-emerald-600" /> Route Sales Breakdown
+        </button>
         <button
           onClick={() => setActiveTab('SALES')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition ${
-            activeTab === 'SALES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-          }`}
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition ${activeTab === 'SALES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
         >
-          <DollarSign className="w-4 h-4 text-emerald-600" /> End-of-Day Sales Summary
+          <DollarSign className="w-4 h-4 text-amber-600" /> Driver Bills Summary
         </button>
         <button
           onClick={() => setActiveTab('STOCK')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition ${
-            activeTab === 'STOCK' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-          }`}
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition ${activeTab === 'STOCK' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
         >
-          <Boxes className="w-4 h-4 text-blue-600" /> Stock Movement History
+          <Boxes className="w-4 h-4 text-indigo-600" /> Warehouse Movements
         </button>
         <button
           onClick={() => setActiveTab('BALANCES')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition ${
-            activeTab === 'BALANCES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-          }`}
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition ${activeTab === 'BALANCES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
         >
           <Users className="w-4 h-4 text-purple-600" /> Customer Receivables
         </button>
       </div>
 
       {/* REPORT CONTENT AREA */}
-      <div className="bg-white border border-slate-200/70 rounded-3xl shadow-[0_2px_8px_rgba(0,0,0,0.03)] p-8 space-y-6">
+      <div className="bg-white border border-slate-200/70 rounded-3xl shadow-2xs p-8 space-y-6">
         {/* Printable Report Header */}
         <div className="border-b border-slate-100 pb-4">
           <div className="flex justify-between items-start">
             <div>
               <h2 className="text-xl font-bold text-slate-900">
-                {activeTab === 'SALES' && 'Daily Sales & Distribution Summary'}
-                {activeTab === 'STOCK' && 'Warehouse Stock Intake & Outbound Movements'}
-                {activeTab === 'BALANCES' && 'Customer Outstanding Receivables Statement'}
+                {activeTab === 'LORRIES' && 'Lorry Morning Load & Evening Settlement Audit'}
+                {activeTab === 'ROUTES' && '3 Routes Distribution Performance Analysis'}
+                {activeTab === 'SALES' && 'Daily Driver Sales Bills Log'}
+                {activeTab === 'STOCK' && 'Central Warehouse Stock Movements (Inbounds, Loads, Returns)'}
+                {activeTab === 'BALANCES' && 'Route Retail Customer Credit Statements'}
               </h2>
               <p className="text-xs text-slate-400 mt-1">
                 Generated: {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
@@ -160,13 +190,107 @@ export const Reports: React.FC = () => {
           </div>
         </div>
 
-        {/* 1. SALES REPORT */}
+        {/* 1. LORRIES REPORT */}
+        {activeTab === 'LORRIES' && (
+          <div className="space-y-4">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-100">
+                    <th className="p-3">Gate Pass #</th>
+                    <th className="p-3">Date</th>
+                    <th className="p-3">Lorry / Driver</th>
+                    <th className="p-3">Route</th>
+                    <th className="p-3 text-center">Loaded</th>
+                    <th className="p-3 text-center">Sold</th>
+                    <th className="p-3 text-center">Returned</th>
+                    <th className="p-3 text-right">Sales Value</th>
+                    <th className="p-3 text-right">Cash Handover</th>
+                    <th className="p-3 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {lorryLoadings.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="p-8 text-center text-slate-400">
+                        No lorry loadings recorded yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    lorryLoadings.map((load) => (
+                      <tr key={load.id} className="hover:bg-slate-50/50">
+                        <td className="p-3 font-mono font-bold text-slate-900">{load.loadingNumber}</td>
+                        <td className="p-3 text-slate-500 font-mono">
+                          {new Date(load.date).toLocaleDateString()}
+                        </td>
+                        <td className="p-3">
+                          <span className="font-bold text-slate-800 block">{load.lorry.vehicleNumber}</span>
+                          <span className="text-slate-400">{load.lorry.driverName}</span>
+                        </td>
+                        <td className="p-3 font-medium text-slate-700">{load.lorry.route?.name || '—'}</td>
+                        <td className="p-3 text-center font-mono font-bold text-slate-900">{load.totalLoadedItems}</td>
+                        <td className="p-3 text-center font-mono font-bold text-emerald-600">{load.totalSoldItems}</td>
+                        <td className="p-3 text-center font-mono font-bold text-blue-600">{load.totalReturnedItems}</td>
+                        <td className="p-3 text-right font-mono font-bold text-slate-900">{formatMoney(load.totalSalesAmount)}</td>
+                        <td className="p-3 text-right font-mono font-bold text-emerald-600">{formatMoney(load.cashCollected)}</td>
+                        <td className="p-3 text-center">
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${load.status === 'SETTLED'
+                                ? 'bg-slate-100 text-slate-600'
+                                : 'bg-blue-50 text-blue-700'
+                              }`}
+                          >
+                            {load.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* 2. ROUTES REPORT */}
+        {activeTab === 'ROUTES' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {routeSummaries.map((route) => (
+                <div key={route.id} className="p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs font-bold text-blue-600">{route.code}</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-white border border-slate-200 rounded-md">
+                      {route.customerCount} Outlets
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900">{route.name}</h3>
+                  <div className="text-xs text-slate-500">
+                    Lorry: <strong className="text-slate-800">{route.lorry?.vehicleNumber || 'Unassigned'}</strong> ({route.lorry?.driverName || ''})
+                  </div>
+                  <div className="pt-2 border-t border-slate-200/70 grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block uppercase font-bold">Total Sales</span>
+                      <span className="font-mono font-bold text-slate-900">{formatMoney(route.totalSales)}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block uppercase font-bold">Cash / Credit</span>
+                      <span className="font-mono font-bold text-emerald-600">{formatMoney(route.totalCash)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 3. SALES REPORT */}
         {activeTab === 'SALES' && salesData && (
           <div className="space-y-6">
             <div className="grid grid-cols-3 gap-6 bg-slate-50/70 p-6 rounded-2xl border border-slate-100">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                  Total Orders
+                  Total Bills
                 </span>
                 <span className="text-2xl font-bold text-slate-900">{salesData.ordersCount}</span>
               </div>
@@ -174,26 +298,27 @@ export const Reports: React.FC = () => {
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
                   Gross Subtotal
                 </span>
-                <span className="text-2xl font-bold text-slate-900">{formatCurrency(salesData.totalGross)}</span>
+                <span className="text-2xl font-bold text-slate-900 font-mono">{formatMoney(salesData.totalGross)}</span>
               </div>
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
                   Net Dispatched Sales
                 </span>
-                <span className="text-2xl font-bold text-emerald-700">{formatCurrency(salesData.totalNet)}</span>
+                <span className="text-2xl font-bold text-emerald-700 font-mono">{formatMoney(salesData.totalNet)}</span>
               </div>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
+              <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-slate-50 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-100">
-                    <th className="p-3">Order #</th>
-                    <th className="p-3">Client</th>
-                    <th className="p-3">Time</th>
+                  <tr className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-100">
+                    <th className="p-3">Bill #</th>
+                    <th className="p-3">Paper Slip</th>
+                    <th className="p-3">Lorry</th>
+                    <th className="p-3">Retail Client</th>
                     <th className="p-3 text-right">Subtotal</th>
-                    <th className="p-3 text-right">Discount</th>
                     <th className="p-3 text-right">Net Total</th>
+                    <th className="p-3 text-right">Cash Paid</th>
                     <th className="p-3 text-center">Status</th>
                   </tr>
                 </thead>
@@ -201,16 +326,15 @@ export const Reports: React.FC = () => {
                   {salesData.orders.map((o: any) => (
                     <tr key={o.id} className="hover:bg-slate-50/50">
                       <td className="p-3 font-mono font-bold text-slate-800">{o.orderNumber}</td>
+                      <td className="p-3 font-mono font-semibold text-blue-600">{o.paperBillNumber || '—'}</td>
+                      <td className="p-3 text-slate-600">{o.lorry?.vehicleNumber || 'Warehouse'}</td>
                       <td className="p-3 font-medium text-slate-900">{o.customer.name}</td>
-                      <td className="p-3 text-xs text-slate-500">
-                        {new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                      <td className="p-3 text-right text-slate-600">{formatCurrency(o.subtotal)}</td>
-                      <td className="p-3 text-right text-emerald-600 font-medium">-{formatCurrency(o.discountAmount)}</td>
-                      <td className="p-3 text-right font-bold text-slate-900">{formatCurrency(o.netTotal)}</td>
+                      <td className="p-3 text-right font-mono text-slate-600">{formatMoney(o.subtotal)}</td>
+                      <td className="p-3 text-right font-mono font-bold text-slate-900">{formatMoney(o.netTotal)}</td>
+                      <td className="p-3 text-right font-mono font-semibold text-emerald-600">{formatMoney(o.cashReceived)}</td>
                       <td className="p-3 text-center">
-                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700">
-                          {o.status}
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700">
+                          {o.paymentMethod} • {o.paymentStatus}
                         </span>
                       </td>
                     </tr>
@@ -221,49 +345,49 @@ export const Reports: React.FC = () => {
           </div>
         )}
 
-        {/* 2. STOCK MOVEMENTS REPORT */}
+        {/* 4. STOCK MOVEMENTS REPORT */}
         {activeTab === 'STOCK' && (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
+            <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-50 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-100">
+                <tr className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-100">
                   <th className="p-3">Timestamp</th>
                   <th className="p-3">SKU</th>
                   <th className="p-3">Product Name</th>
-                  <th className="p-3">Type</th>
-                  <th className="p-3 text-right">Qty</th>
-                  <th className="p-3">Reference / PO</th>
-                  <th className="p-3">Audit Notes</th>
+                  <th className="p-3">Movement Type</th>
+                  <th className="p-3 text-right">Qty Units</th>
+                  <th className="p-3">Reference / Gate Pass</th>
+                  <th className="p-3">Audit Details</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {stockMovements.map((m) => (
                   <tr key={m.id} className="hover:bg-slate-50/50">
-                    <td className="p-3 text-xs text-slate-500">
+                    <td className="p-3 text-slate-500 font-mono">
                       {new Date(m.createdAt).toLocaleDateString()} {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </td>
                     <td className="p-3 font-mono font-bold text-slate-900">{m.product.sku}</td>
                     <td className="p-3 font-semibold text-slate-900">{m.product.name}</td>
                     <td className="p-3">
                       <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                          m.type === 'INBOUND'
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${m.type === 'INBOUND' || m.type === 'LORRY_RETURN'
                             ? 'bg-emerald-50 text-emerald-700'
-                            : m.type === 'OUTBOUND'
-                            ? 'bg-blue-50 text-blue-700'
-                            : 'bg-amber-50 text-amber-700'
-                        }`}
+                            : m.type === 'LORRY_LOAD' || m.type === 'OUTBOUND'
+                              ? 'bg-blue-50 text-blue-700'
+                              : 'bg-amber-50 text-amber-700'
+                          }`}
                       >
                         {m.type === 'INBOUND' && <ArrowDownRight className="w-3 h-3" />}
-                        {m.type === 'OUTBOUND' && <ArrowUpRight className="w-3 h-3" />}
+                        {m.type === 'LORRY_RETURN' && <RotateCcw className="w-3 h-3" />}
+                        {m.type === 'LORRY_LOAD' && <Truck className="w-3 h-3" />}
                         {m.type}
                       </span>
                     </td>
-                    <td className={`p-3 text-right font-bold ${m.quantity > 0 ? 'text-emerald-700' : 'text-slate-800'}`}>
+                    <td className={`p-3 text-right font-mono font-bold ${m.quantity > 0 ? 'text-emerald-700' : 'text-slate-800'}`}>
                       {m.quantity > 0 ? `+${m.quantity}` : m.quantity}
                     </td>
-                    <td className="p-3 text-xs font-mono text-slate-600">{m.referenceId || '—'}</td>
-                    <td className="p-3 text-xs text-slate-500">{m.notes || '—'}</td>
+                    <td className="p-3 font-mono text-slate-600">{m.referenceId || '—'}</td>
+                    <td className="p-3 text-slate-500">{m.notes || '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -271,7 +395,7 @@ export const Reports: React.FC = () => {
           </div>
         )}
 
-        {/* 3. CUSTOMER BALANCES REPORT */}
+        {/* 5. CUSTOMER BALANCES REPORT */}
         {activeTab === 'BALANCES' && balancesData && (
           <div className="space-y-6">
             <div className="bg-slate-50/80 p-6 rounded-2xl border border-slate-100 flex items-center justify-between">
@@ -279,8 +403,8 @@ export const Reports: React.FC = () => {
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
                   Total Outstanding Receivables Across All Accounts
                 </span>
-                <span className="text-3xl font-bold text-slate-900">
-                  {formatCurrency(balancesData.totalOutstanding)}
+                <span className="text-3xl font-bold text-slate-900 font-mono">
+                  {formatMoney(balancesData.totalOutstanding)}
                 </span>
               </div>
               <span className="text-xs font-bold px-3 py-1 bg-amber-100 text-amber-800 rounded-full">
@@ -289,11 +413,12 @@ export const Reports: React.FC = () => {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
+              <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-slate-50 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-100">
+                  <tr className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-100">
                     <th className="p-3">Client Code</th>
                     <th className="p-3">Client Name</th>
+                    <th className="p-3">Assigned Route</th>
                     <th className="p-3">Phone</th>
                     <th className="p-3">Pricing Tier</th>
                     <th className="p-3 text-right">Credit Limit</th>
@@ -301,15 +426,16 @@ export const Reports: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {balancesData.customers.map((c: Customer) => (
+                  {balancesData.customers.map((c: any) => (
                     <tr key={c.id} className="hover:bg-slate-50/50">
                       <td className="p-3 font-mono font-bold text-slate-900">{c.code}</td>
                       <td className="p-3 font-semibold text-slate-900">{c.name}</td>
-                      <td className="p-3 font-mono text-xs text-slate-600">{c.phone}</td>
-                      <td className="p-3 text-xs font-semibold text-slate-700">{c.pricingTier}</td>
-                      <td className="p-3 text-right text-slate-500 font-medium">{formatCurrency(c.creditLimit)}</td>
-                      <td className="p-3 text-right font-bold text-amber-700 text-base">
-                        {formatCurrency(c.outstandingBalance)}
+                      <td className="p-3 text-slate-600 font-medium">{c.route?.name || 'Local'}</td>
+                      <td className="p-3 font-mono text-slate-600">{c.phone}</td>
+                      <td className="p-3 font-semibold text-slate-700">{c.pricingTier}</td>
+                      <td className="p-3 text-right text-slate-500 font-mono">{formatMoney(c.creditLimit)}</td>
+                      <td className="p-3 text-right font-bold text-amber-700 text-sm font-mono">
+                        {formatMoney(c.outstandingBalance)}
                       </td>
                     </tr>
                   ))}

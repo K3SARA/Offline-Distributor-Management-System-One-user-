@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './pages/Dashboard';
-import { OrderEntry } from './pages/OrderEntry';
 import { Inventory } from './pages/Inventory';
+import { LorryLoading } from './pages/LorryLoading';
+import { BillEntry } from './pages/BillEntry';
+import { LorrySettlement } from './pages/LorrySettlement';
 import { Customers } from './pages/Customers';
 import { Reports } from './pages/Reports';
 import { InvoiceModal } from './components/InvoiceModal';
@@ -13,11 +15,6 @@ export const AppContent: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [activeInvoiceOrder, setActiveInvoiceOrder] = useState<Order | null>(null);
 
-  const handleOrderCompleted = (order: Order) => {
-    setActiveInvoiceOrder(order);
-    setCurrentTab('dashboard');
-  };
-
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#F1F3F6] text-[#1D1D1F]">
       {/* Sidebar Navigation */}
@@ -27,20 +24,23 @@ export const AppContent: React.FC = () => {
       <main className="flex-1 h-screen overflow-hidden flex flex-col">
         {currentTab === 'dashboard' && (
           <Dashboard
-            onNavigateToOrder={() => setCurrentTab('pos')}
+            onNavigateToLoading={() => setCurrentTab('lorry-loading')}
+            onNavigateToBillEntry={() => setCurrentTab('bill-entry')}
+            onNavigateToSettlement={() => setCurrentTab('lorry-settlement')}
             onNavigateToInventory={() => setCurrentTab('inventory')}
             onViewInvoice={(order) => setActiveInvoiceOrder(order)}
           />
         )}
 
-        {currentTab === 'pos' && (
-          <OrderEntry
-            onBack={() => setCurrentTab('dashboard')}
-            onOrderCompleted={handleOrderCompleted}
-          />
+        {currentTab === 'inventory' && <Inventory />}
+
+        {currentTab === 'lorry-loading' && <LorryLoading />}
+
+        {currentTab === 'bill-entry' && (
+          <BillEntry onViewInvoice={(order) => setActiveInvoiceOrder(order)} />
         )}
 
-        {currentTab === 'inventory' && <Inventory />}
+        {currentTab === 'lorry-settlement' && <LorrySettlement />}
 
         {currentTab === 'customers' && (
           <Customers onViewInvoice={(order) => setActiveInvoiceOrder(order)} />

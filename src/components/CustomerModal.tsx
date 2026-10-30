@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Check } from 'lucide-react';
-import { Customer } from '../types';
-import { CustomerService } from '../services/api';
+import { Customer, Route } from '../types';
+import { CustomerService, RouteService } from '../services/api';
 import { useCurrency } from '../context/CurrencyContext';
 
 interface CustomerModalProps {
@@ -18,18 +18,26 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
   onSaved
 }) => {
   const { currencyConfig } = useCurrency();
+  const [routes, setRoutes] = useState<Route[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     companyName: '',
     phone: '',
     deliveryAddress: '',
     city: 'Local',
+    routeId: '',
     pricingTier: 'STANDARD',
     discountPercentage: '0',
-    creditLimit: '5000'
+    creditLimit: '50000'
   });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      RouteService.getAll().then(setRoutes).catch(() => {});
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (customer) {
@@ -39,6 +47,7 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
         phone: customer.phone,
         deliveryAddress: customer.deliveryAddress,
         city: customer.city,
+        routeId: customer.routeId || '',
         pricingTier: customer.pricingTier,
         discountPercentage: customer.discountPercentage.toString(),
         creditLimit: customer.creditLimit.toString()
@@ -50,9 +59,10 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
         phone: '',
         deliveryAddress: '',
         city: 'Local',
+        routeId: '',
         pricingTier: 'STANDARD',
         discountPercentage: '0',
-        creditLimit: '5000'
+        creditLimit: '50000'
       });
     }
     setError(null);
@@ -78,9 +88,10 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
           phone: formData.phone,
           deliveryAddress: formData.deliveryAddress,
           city: formData.city,
+          routeId: formData.routeId || null,
           pricingTier: formData.pricingTier as any,
           discountPercentage: parseFloat(formData.discountPercentage || '0'),
-          creditLimit: parseFloat(formData.creditLimit || '5000')
+          creditLimit: parseFloat(formData.creditLimit || '50000')
         });
       } else {
         await CustomerService.create({
@@ -89,9 +100,10 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
           phone: formData.phone,
           deliveryAddress: formData.deliveryAddress,
           city: formData.city,
+          routeId: formData.routeId || null,
           pricingTier: formData.pricingTier as any,
           discountPercentage: parseFloat(formData.discountPercentage || '0'),
-          creditLimit: parseFloat(formData.creditLimit || '5000')
+          creditLimit: parseFloat(formData.creditLimit || '50000')
         });
       }
       onSaved();
@@ -108,7 +120,7 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
       <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden">
         <div className="px-7 py-5 border-b border-slate-100 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-slate-900">
-            {customer ? 'Edit Client Profile' : 'Register New Client / Distributor'}
+            {customer ? 'Edit Client Profile' : 'Register New Retail Client'}
           </h3>
           <button
             onClick={onClose}
@@ -161,7 +173,7 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
                 required
                 value={formData.phone}
                 onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="+1 (555) 000-0000"
+                placeholder="+94 77 123 4567"
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0071E3]"
               />
             </div>
@@ -169,31 +181,51 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
 
           <div>
             <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
-              Delivery Address / Receiving Bay *
+              Delivery Address / Retail Outlet Location *
             </label>
             <input
               type="text"
               required
               value={formData.deliveryAddress}
               onChange={e => setFormData({ ...formData, deliveryAddress: e.target.value })}
-              placeholder="e.g. 448 Central Ave, Warehouse Dock #2"
+              placeholder="e.g. 448 Galle Road, Colombo 03"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0071E3]"
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                City / Region
+                City / Town
               </label>
               <input
                 type="text"
                 value={formData.city}
                 onChange={e => setFormData({ ...formData, city: e.target.value })}
-                placeholder="Metro City"
+                placeholder="Colombo"
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0071E3]"
               />
             </div>
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                Assigned Route (Lorry)
+              </label>
+              <select
+                value={formData.routeId}
+                onChange={e => setFormData({ ...formData, routeId: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0071E3]"
+              >
+                <option value="">-- No Route Assigned --</option>
+                {routes.map(r => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
                 Pricing Tier
@@ -226,18 +258,17 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0071E3]"
               />
             </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
-              Credit Limit ({currencyConfig.symbol})
-            </label>
-            <input
-              type="number"
-              value={formData.creditLimit}
-              onChange={e => setFormData({ ...formData, creditLimit: e.target.value })}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0071E3]"
-            />
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                Credit Limit ({currencyConfig.symbol})
+              </label>
+              <input
+                type="number"
+                value={formData.creditLimit}
+                onChange={e => setFormData({ ...formData, creditLimit: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0071E3]"
+              />
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
@@ -251,7 +282,7 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2.5 bg-[#0071E3] hover:bg-[#0077ED] text-white rounded-xl text-sm font-semibold shadow-sm transition flex items-center gap-1.5"
+              className="px-6 py-2.5 bg-[#0071E3] hover:bg-blue-600 text-white rounded-xl text-sm font-semibold shadow-sm transition flex items-center gap-1.5"
             >
               <Check className="w-4 h-4" /> {loading ? 'Saving...' : 'Save Client'}
             </button>
