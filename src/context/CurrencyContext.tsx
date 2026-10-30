@@ -47,6 +47,7 @@ interface CurrencyContextType {
   currencyConfig: CurrencyConfig;
   setCurrency: (currency: CurrencyCode) => void;
   formatCurrency: (amount: number | undefined | null) => string;
+  formatMoney: (amount: number | undefined | null) => string;
 }
 
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
@@ -81,7 +82,13 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   return (
-    <CurrencyContext.Provider value={{ currency, currencyConfig, setCurrency, formatCurrency }}>
+    <CurrencyContext.Provider value={{
+      currency,
+      currencyConfig,
+      setCurrency,
+      formatCurrency,
+      formatMoney: formatCurrency
+    }}>
       {children}
     </CurrencyContext.Provider>
   );
