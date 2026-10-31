@@ -216,49 +216,49 @@ export const LorrySettlement: React.FC = () => {
         <form onSubmit={handleCompleteSettlement} className="space-y-4 sm:space-y-6">
           {/* Quick Metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4">
-            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+            <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
                 Morning Loaded
               </span>
-              <span className="text-base sm:text-xl font-bold text-slate-900 mt-0.5 sm:mt-1 block">
+              <span className="text-lg sm:text-2xl font-bold text-slate-900 mt-1 block font-mono">
                 {activeLoading.totalLoadedItems} Units
               </span>
-              <span className="text-[11px] text-slate-400 truncate block">Gate Pass: {activeLoading.loadingNumber}</span>
+              <span className="text-xs text-slate-500 truncate block mt-0.5">Gate Pass: {activeLoading.loadingNumber}</span>
             </div>
 
-            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+            <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
                 Total Sold (Bills)
               </span>
-              <span className="text-base sm:text-xl font-bold text-emerald-600 mt-0.5 sm:mt-1 block">
+              <span className="text-lg sm:text-2xl font-bold text-emerald-600 mt-1 block font-mono">
                 {activeLoading.totalSoldItems} Units
               </span>
-              <span className="text-[11px] text-slate-400 truncate block">
+              <span className="text-xs text-slate-500 truncate block mt-0.5">
                 {formatMoney(activeLoading.totalSalesAmount)} {activeLoading.totalFreeItems > 0 ? `(+${activeLoading.totalFreeItems} Free)` : ''}
               </span>
             </div>
 
-            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+            <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
                 Expected Cash
               </span>
-              <span className="text-base sm:text-xl font-bold text-blue-600 mt-0.5 sm:mt-1 block">
+              <span className="text-lg sm:text-2xl font-bold text-blue-600 mt-1 block font-mono">
                 {formatMoney(activeLoading.cashCollected)}
               </span>
-              <span className="text-[11px] text-slate-400 truncate block">Credit: {formatMoney(activeLoading.creditGiven)}</span>
+              <span className="text-xs text-slate-500 truncate block mt-0.5">Credit: {formatMoney(activeLoading.creditGiven)}</span>
             </div>
 
-            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+            <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
                 Stock Discrepancy
               </span>
               <span
-                className={`text-base sm:text-xl font-bold mt-0.5 sm:mt-1 block ${totalDiscrepancy > 0 ? 'text-rose-600' : 'text-slate-900'
+                className={`text-lg sm:text-2xl font-bold mt-1 block font-mono ${totalDiscrepancy > 0 ? 'text-rose-600' : 'text-slate-900'
                   }`}
               >
                 {totalDiscrepancy} Units
               </span>
-              <span className="text-[11px] text-slate-400 block">
+              <span className="text-xs text-slate-500 block mt-0.5">
                 {totalDiscrepancy === 0 ? 'Exact match' : 'Shortage'}
               </span>
             </div>
@@ -267,25 +267,25 @@ export const LorrySettlement: React.FC = () => {
           {/* Stock Reconciliation Table */}
           <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs p-4 sm:p-6 space-y-3 sm:space-y-4">
             <div className="border-b border-slate-100 pb-3">
-              <h3 className="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider">
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 uppercase tracking-wider">
                 Item Reconciliation & Unsold Return
               </h3>
-              <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-400 mt-0.5">
                 Verify returned physical items. Returned units will be added back to warehouse stock.
               </p>
             </div>
 
             <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-              <table className="w-full text-left text-xs min-w-[620px]">
+              <table className="w-full text-left text-sm min-w-[620px]">
                 <thead>
-                  <tr className="border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    <th className="py-2.5 px-3">Product Name</th>
-                    <th className="py-2.5 px-3 text-center">Loaded</th>
-                    <th className="py-2.5 px-3 text-center">Paid Sold</th>
-                    <th className="py-2.5 px-3 text-center">Free Issued</th>
-                    <th className="py-2.5 px-3 text-center">Expected Left</th>
-                    <th className="py-2.5 px-3 text-center">Actual Returned</th>
-                    <th className="py-2.5 px-3 text-right">Shortage</th>
+                  <tr className="border-b border-slate-100 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    <th className="py-3 px-3.5">Product Name</th>
+                    <th className="py-3 px-3.5 text-center">Loaded</th>
+                    <th className="py-3 px-3.5 text-center">Paid Sold</th>
+                    <th className="py-3 px-3.5 text-center">Free Issued</th>
+                    <th className="py-3 px-3.5 text-center">Expected Left</th>
+                    <th className="py-3 px-3.5 text-center">Actual Returned</th>
+                    <th className="py-3 px-3.5 text-right">Shortage</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -349,16 +349,16 @@ export const LorrySettlement: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
                   Expected Cash From Bills
                 </label>
-                <div className="px-3.5 py-2.5 bg-slate-100 rounded-xl font-mono font-bold text-slate-800 text-sm">
+                <div className="px-3.5 py-2.5 bg-slate-100 rounded-xl font-mono font-bold text-slate-800 text-sm sm:text-base">
                   {formatMoney(expectedCash)}
                 </div>
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
                   Driver Handover Cash Amount *
                 </label>
                 <input
@@ -368,16 +368,16 @@ export const LorrySettlement: React.FC = () => {
                   onChange={(e) => setCashHandover(e.target.value)}
                   placeholder="0.00"
                   required
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 font-mono font-bold text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 font-mono font-bold text-slate-900 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
                   Cash Discrepancy
                 </label>
                 <div
-                  className={`px-3.5 py-2.5 rounded-xl font-mono font-bold text-sm ${cashDifference < 0
+                  className={`px-3.5 py-2.5 rounded-xl font-mono font-bold text-sm sm:text-base ${cashDifference < 0
                       ? 'bg-rose-50 text-rose-700 border border-rose-200'
                       : cashDifference > 0
                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'

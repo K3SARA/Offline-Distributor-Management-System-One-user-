@@ -66,20 +66,20 @@ export const AppContent: React.FC = () => {
               <Menu className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-2xs">
-                <Truck className="w-4 h-4 stroke-[2.2]" />
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-2xs">
+                <Truck className="w-4.5 h-4.5 stroke-[2.2]" />
               </div>
-              <span className="font-bold text-slate-900 text-sm tracking-tight">
+              <span className="font-bold text-slate-900 text-base tracking-tight">
                 Distributor Pro
               </span>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60 font-mono">
+            <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/60 font-mono">
               {CURRENCIES[currency]?.symbol || 'Rs.'}
             </span>
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Fleet Active" />
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" title="Fleet Active" />
           </div>
         </header>
 
@@ -128,7 +128,7 @@ export const AppContent: React.FC = () => {
                 }`}
               >
                 <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
-                <span className="text-[10px] mt-0.5 tracking-tight">{item.label}</span>
+                <span className="text-[11px] font-semibold mt-0.5 tracking-tight">{item.label}</span>
               </button>
             );
           })}

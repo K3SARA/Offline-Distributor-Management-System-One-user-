@@ -22,14 +22,14 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, onClose }) =>
         {/* Modal Controls */}
         <div className="px-4 sm:px-8 py-3 sm:py-4 border-b border-slate-100 flex items-center justify-between gap-2 bg-slate-50/50 print:hidden shrink-0">
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
               Bill Slip
             </span>
-            <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-semibold bg-blue-100 text-blue-700">
+            <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-blue-100 text-blue-700">
               {order.status}
             </span>
             {order.paperBillNumber && (
-              <span className="text-[10px] sm:text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
+              <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-700">
                 Slip: {order.paperBillNumber}
               </span>
             )}

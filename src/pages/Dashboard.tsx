@@ -145,10 +145,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <Calendar className="w-4 h-4" />
           </div>
           <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
               Timeframe Filter
             </span>
-            <span className="text-xs font-bold text-slate-900">
+            <span className="text-sm font-bold text-slate-900">
               Showing {getPresetLabel()} Analytics & Sales
             </span>
           </div>
@@ -190,14 +190,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       <span className="font-mono text-xs font-bold uppercase tracking-wider text-slate-900 block">
                         {lorry.vehicleNumber}
                       </span>
-                      <span className="text-xs font-semibold text-slate-600">
+                      <span className="text-sm font-semibold text-slate-700">
                         {lorry.driverName}
                       </span>
                     </div>
                   </div>
 
                   <span
-                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${isSettled
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase ${isSettled
                         ? 'bg-slate-100 text-slate-600'
                         : isActive
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
@@ -215,18 +215,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                 <div className="p-3 bg-slate-50 rounded-2xl grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
                       Floating Stock
                     </span>
-                    <span className="font-mono font-bold text-slate-800">
+                    <span className="font-mono font-bold text-slate-800 text-sm">
                       {lorry.floatingStockUnits} Units
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
                       Period Sales
                     </span>
-                    <span className="font-mono font-bold text-blue-600">
+                    <span className="font-mono font-bold text-blue-600 text-sm">
                       {formatMoney(lorry.todaySales)}
                     </span>
                   </div>
@@ -348,14 +348,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50/80 text-slate-400 text-[11px] font-bold uppercase tracking-wider border-b border-slate-100">
-                  <th className="px-7 py-4">Bill #</th>
-                  <th className="px-6 py-4">Paper Slip #</th>
-                  <th className="px-6 py-4">Lorry / Driver</th>
-                  <th className="px-6 py-4">Retail Client</th>
-                  <th className="px-6 py-4">Net Total</th>
-                  <th className="px-6 py-4">Payment</th>
-                  <th className="px-7 py-4 text-right">Invoice Action</th>
+                <tr className="bg-slate-50/80 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-100">
+                  <th className="px-7 py-3.5">Bill #</th>
+                  <th className="px-6 py-3.5">Paper Slip #</th>
+                  <th className="px-6 py-3.5">Lorry / Driver</th>
+                  <th className="px-6 py-3.5">Retail Client</th>
+                  <th className="px-6 py-3.5">Net Total</th>
+                  <th className="px-6 py-3.5">Payment</th>
+                  <th className="px-7 py-3.5 text-right">Invoice Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">

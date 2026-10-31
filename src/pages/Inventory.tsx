@@ -132,9 +132,9 @@ export const Inventory: React.FC = () => {
       {/* Products Table */}
       <div className="bg-white border border-slate-200/70 rounded-2xl sm:rounded-3xl shadow-2xs overflow-hidden">
         <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-          <table className="w-full text-left border-collapse text-xs min-w-[680px]">
+          <table className="w-full text-left border-collapse text-sm min-w-[680px]">
             <thead>
-              <tr className="bg-slate-50/80 text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-100">
+              <tr className="bg-slate-50/80 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-100">
                 <th className="px-7 py-4">SKU</th>
                 <th className="px-6 py-4">Product Name</th>
                 <th className="px-6 py-4">Category</th>
@@ -162,17 +162,17 @@ export const Inventory: React.FC = () => {
                         {p.sku}
                       </td>
                       <td className="px-6 py-4">
-                        <span className="font-semibold text-slate-900 block">{p.name}</span>
+                        <span className="font-semibold text-slate-900 block text-sm">{p.name}</span>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[10px] text-slate-400">Pack: {p.unit}</span>
+                          <span className="text-xs text-slate-400">Pack: {p.unit}</span>
                           {p.freeRatioBuy && p.freeRatioBuy > 0 && p.freeRatioGet ? (
-                            <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 font-semibold rounded text-[10px]">
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-semibold rounded-md text-xs">
                               Promo: Buy {p.freeRatioBuy} + {p.freeRatioGet} Free
                             </span>
                           ) : null}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-xs font-medium text-slate-600">
+                      <td className="px-6 py-4 text-xs font-semibold text-slate-600">
                         <span className="px-2.5 py-1 bg-slate-100 rounded-lg">
                           {p.category}
                         </span>
@@ -183,7 +183,7 @@ export const Inventory: React.FC = () => {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <span
-                            className={`font-mono font-bold text-xs px-3 py-1 rounded-full ${
+                            className={`font-mono font-bold text-sm px-3 py-1 rounded-full ${
                               p.currentStock <= 0
                                 ? 'bg-rose-50 text-rose-700 border border-rose-200'
                                 : isLow
@@ -194,15 +194,15 @@ export const Inventory: React.FC = () => {
                             {p.currentStock} {p.unit}
                           </span>
                           {isLow && (
-                            <span className="text-[10px] font-semibold text-amber-600" title={`Alert at ≤ ${p.minStockAlert}`}>
+                            <span className="text-xs font-bold text-amber-600" title={`Alert at ≤ ${p.minStockAlert}`}>
                               (Low)
                             </span>
                           )}
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="font-mono text-xs font-semibold text-blue-600 flex items-center gap-1">
-                          <Truck className="w-3.5 h-3.5 text-blue-500" />
+                        <span className="font-mono text-sm font-semibold text-blue-600 flex items-center gap-1.5">
+                          <Truck className="w-4 h-4 text-blue-500" />
                           {totalInLorries} {p.unit}
                         </span>
                       </td>

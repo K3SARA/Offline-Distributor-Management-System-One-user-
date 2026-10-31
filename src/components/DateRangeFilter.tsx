@@ -121,7 +121,7 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
               key={p.id}
               type="button"
               onClick={() => handleSelectPreset(p.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150 ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all duration-150 ${
                 isActive
                   ? 'bg-blue-600 text-white shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'

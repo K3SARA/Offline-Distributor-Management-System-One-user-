@@ -234,20 +234,20 @@ export const Reports: React.FC = () => {
         {activeTab === 'LORRIES' && (
           <div className="space-y-4">
             <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-              <table className="w-full text-left border-collapse text-xs min-w-[760px]">
+              <table className="w-full text-left border-collapse text-sm min-w-[760px]">
                 <thead>
-                  <tr className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-100">
-                    <th className="p-3">Gate Pass #</th>
-                    <th className="p-3">Date</th>
-                    <th className="p-3">Lorry / Driver</th>
-                    <th className="p-3">Route</th>
-                    <th className="p-3 text-center">Loaded</th>
-                    <th className="p-3 text-center">Paid Sold</th>
-                    <th className="p-3 text-center">Free Issued</th>
-                    <th className="p-3 text-center">Returned</th>
-                    <th className="p-3 text-right">Sales Value</th>
-                    <th className="p-3 text-right">Cash Handover</th>
-                    <th className="p-3 text-center">Status</th>
+                  <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-100">
+                    <th className="py-3 px-3.5">Gate Pass #</th>
+                    <th className="py-3 px-3.5">Date</th>
+                    <th className="py-3 px-3.5">Lorry / Driver</th>
+                    <th className="py-3 px-3.5">Route</th>
+                    <th className="py-3 px-3.5 text-center">Loaded</th>
+                    <th className="py-3 px-3.5 text-center">Paid Sold</th>
+                    <th className="py-3 px-3.5 text-center">Free Issued</th>
+                    <th className="py-3 px-3.5 text-center">Returned</th>
+                    <th className="py-3 px-3.5 text-right">Sales Value</th>
+                    <th className="py-3 px-3.5 text-right">Cash Handover</th>
+                    <th className="py-3 px-3.5 text-center">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -260,34 +260,34 @@ export const Reports: React.FC = () => {
                   ) : (
                     lorryLoadings.map((load) => (
                       <tr key={load.id} className="hover:bg-slate-50/50">
-                        <td className="p-3 font-mono font-bold text-slate-900">{load.loadingNumber}</td>
-                        <td className="p-3 text-slate-500 font-mono">
+                        <td className="py-3 px-3.5 font-mono font-bold text-slate-900">{load.loadingNumber}</td>
+                        <td className="py-3 px-3.5 text-slate-500 font-mono">
                           {new Date(load.date).toLocaleDateString()}
                         </td>
-                        <td className="p-3">
+                        <td className="py-3 px-3.5">
                           <span className="font-bold text-slate-800 block">{load.lorry.vehicleNumber}</span>
                           <span className="text-slate-400">{load.lorry.driverName}</span>
                         </td>
-                        <td className="p-3 font-medium text-slate-700">{load.lorry.route?.name || '—'}</td>
-                        <td className="p-3 text-center font-mono font-bold text-slate-900">{load.totalLoadedItems}</td>
-                        <td className="p-3 text-center font-mono font-bold text-emerald-600">{load.totalSoldItems}</td>
-                        <td className="p-3 text-center font-mono font-semibold text-blue-600">
+                        <td className="py-3 px-3.5 font-medium text-slate-700">{load.lorry.route?.name || '—'}</td>
+                        <td className="py-3 px-3.5 text-center font-mono font-bold text-slate-900">{load.totalLoadedItems}</td>
+                        <td className="py-3 px-3.5 text-center font-mono font-bold text-emerald-600">{load.totalSoldItems}</td>
+                        <td className="py-3 px-3.5 text-center font-mono font-semibold text-blue-600">
                           {load.totalFreeItems > 0 ? (
-                            <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded">
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded font-bold text-xs">
                               +{load.totalFreeItems}
                             </span>
                           ) : (
                             <span className="text-slate-300">0</span>
                           )}
                         </td>
-                        <td className="p-3 text-center font-mono font-bold text-blue-600">{load.totalReturnedItems}</td>
-                        <td className="p-3 text-right font-mono font-bold text-slate-900">{formatMoney(load.totalSalesAmount)}</td>
-                        <td className="p-3 text-right font-mono font-bold text-emerald-600">{formatMoney(load.cashCollected)}</td>
-                        <td className="p-3 text-center">
+                        <td className="py-3 px-3.5 text-center font-mono font-bold text-blue-600">{load.totalReturnedItems}</td>
+                        <td className="py-3 px-3.5 text-right font-mono font-bold text-slate-900">{formatMoney(load.totalSalesAmount)}</td>
+                        <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-600">{formatMoney(load.cashCollected)}</td>
+                        <td className="py-3 px-3.5 text-center">
                           <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${load.status === 'SETTLED'
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase ${load.status === 'SETTLED'
                                 ? 'bg-slate-100 text-slate-600'
-                                : 'bg-blue-50 text-blue-700'
+                                : 'bg-blue-50 text-blue-700 border border-blue-200/60'
                               }`}
                           >
                             {load.status}
@@ -359,17 +359,17 @@ export const Reports: React.FC = () => {
             </div>
 
             <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-              <table className="w-full text-left border-collapse text-xs min-w-[720px]">
+              <table className="w-full text-left border-collapse text-sm min-w-[720px]">
                 <thead>
-                  <tr className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-100">
-                    <th className="p-3">Bill #</th>
-                    <th className="p-3">Paper Slip</th>
-                    <th className="p-3">Lorry</th>
-                    <th className="p-3">Retail Client</th>
-                    <th className="p-3 text-right">Subtotal</th>
-                    <th className="p-3 text-right">Net Total</th>
-                    <th className="p-3 text-right">Cash Paid</th>
-                    <th className="p-3 text-center">Status</th>
+                  <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-100">
+                    <th className="py-3 px-3.5">Bill #</th>
+                    <th className="py-3 px-3.5">Paper Slip</th>
+                    <th className="py-3 px-3.5">Lorry</th>
+                    <th className="py-3 px-3.5">Retail Client</th>
+                    <th className="py-3 px-3.5 text-right">Subtotal</th>
+                    <th className="py-3 px-3.5 text-right">Net Total</th>
+                    <th className="py-3 px-3.5 text-right">Cash Paid</th>
+                    <th className="py-3 px-3.5 text-center">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -382,15 +382,15 @@ export const Reports: React.FC = () => {
                   ) : (
                     salesData.orders.map((o: any) => (
                       <tr key={o.id} className="hover:bg-slate-50/50">
-                        <td className="p-3 font-mono font-bold text-slate-800">{o.orderNumber}</td>
-                        <td className="p-3 font-mono font-semibold text-blue-600">{o.paperBillNumber || '—'}</td>
-                        <td className="p-3 text-slate-600">{o.lorry?.vehicleNumber || 'Warehouse'}</td>
-                        <td className="p-3 font-medium text-slate-900">{o.customer.name}</td>
-                        <td className="p-3 text-right font-mono text-slate-600">{formatMoney(o.subtotal)}</td>
-                        <td className="p-3 text-right font-mono font-bold text-slate-900">{formatMoney(o.netTotal)}</td>
-                        <td className="p-3 text-right font-mono font-semibold text-emerald-600">{formatMoney(o.cashReceived)}</td>
-                        <td className="p-3 text-center">
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700">
+                        <td className="py-3 px-3.5 font-mono font-bold text-slate-900">{o.orderNumber}</td>
+                        <td className="py-3 px-3.5 font-mono font-semibold text-blue-600">{o.paperBillNumber || '—'}</td>
+                        <td className="py-3 px-3.5 text-slate-700 font-medium">{o.lorry?.vehicleNumber || 'Warehouse'}</td>
+                        <td className="py-3 px-3.5 font-semibold text-slate-900">{o.customer.name}</td>
+                        <td className="py-3 px-3.5 text-right font-mono text-slate-600">{formatMoney(o.subtotal)}</td>
+                        <td className="py-3 px-3.5 text-right font-mono font-bold text-slate-900">{formatMoney(o.netTotal)}</td>
+                        <td className="py-3 px-3.5 text-right font-mono font-semibold text-emerald-600">{formatMoney(o.cashReceived)}</td>
+                        <td className="py-3 px-3.5 text-center">
+                          <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/60">
                             {o.paymentMethod} • {o.paymentStatus}
                           </span>
                         </td>
@@ -406,16 +406,16 @@ export const Reports: React.FC = () => {
         {/* 4. STOCK MOVEMENTS REPORT */}
         {activeTab === 'STOCK' && (
           <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-            <table className="w-full text-left border-collapse text-xs min-w-[720px]">
+            <table className="w-full text-left border-collapse text-sm min-w-[720px]">
               <thead>
-                <tr className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-100">
-                  <th className="p-3">Timestamp</th>
-                  <th className="p-3">SKU</th>
-                  <th className="p-3">Product Name</th>
-                  <th className="p-3">Movement Type</th>
-                  <th className="p-3 text-right">Qty Units</th>
-                  <th className="p-3">Reference / Gate Pass</th>
-                  <th className="p-3">Audit Details</th>
+                <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-100">
+                  <th className="py-3 px-3.5">Timestamp</th>
+                  <th className="py-3 px-3.5">SKU</th>
+                  <th className="py-3 px-3.5">Product Name</th>
+                  <th className="py-3 px-3.5">Movement Type</th>
+                  <th className="py-3 px-3.5 text-right">Qty Units</th>
+                  <th className="py-3 px-3.5">Reference / Gate Pass</th>
+                  <th className="py-3 px-3.5">Audit Details</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -428,23 +428,23 @@ export const Reports: React.FC = () => {
                 ) : (
                   stockMovements.map((m) => (
                     <tr key={m.id} className="hover:bg-slate-50/50">
-                      <td className="p-3 text-slate-500 font-mono">
+                      <td className="py-3 px-3.5 text-slate-500 font-mono text-xs">
                         {new Date(m.createdAt).toLocaleDateString()} {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </td>
-                      <td className="p-3 font-mono font-bold text-slate-900">{m.product.sku}</td>
-                      <td className="p-3 font-semibold text-slate-900">{m.product.name}</td>
-                      <td className="p-3">
+                      <td className="py-3 px-3.5 font-mono font-bold text-slate-900">{m.product.sku}</td>
+                      <td className="py-3 px-3.5 font-semibold text-slate-900">{m.product.name}</td>
+                      <td className="py-3 px-3.5">
                         <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${m.type === 'INBOUND' || m.type === 'LORRY_RETURN'
-                              ? 'bg-emerald-50 text-emerald-700'
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold ${m.type === 'INBOUND' || m.type === 'LORRY_RETURN'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
                               : m.type === 'LORRY_LOAD' || m.type === 'OUTBOUND'
-                                ? 'bg-blue-50 text-blue-700'
-                                : 'bg-amber-50 text-amber-700'
+                                ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                                : 'bg-amber-50 text-amber-700 border border-amber-200/60'
                             }`}
                         >
-                          {m.type === 'INBOUND' && <ArrowDownRight className="w-3 h-3" />}
-                          {m.type === 'LORRY_RETURN' && <RotateCcw className="w-3 h-3" />}
-                          {m.type === 'LORRY_LOAD' && <Truck className="w-3 h-3" />}
+                          {m.type === 'INBOUND' && <ArrowDownRight className="w-3.5 h-3.5" />}
+                          {m.type === 'LORRY_RETURN' && <RotateCcw className="w-3.5 h-3.5" />}
+                          {m.type === 'LORRY_LOAD' && <Truck className="w-3.5 h-3.5" />}
                           {m.type}
                         </span>
                       </td>

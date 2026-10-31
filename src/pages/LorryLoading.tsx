@@ -284,14 +284,14 @@ export const LorryLoading: React.FC = () => {
                   >
                     {/* Product Selector */}
                     <div className="flex-1 w-full">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
                         Select Product from Central Warehouse
                       </label>
                       <select
                         value={row.productId}
                         onChange={(e) => updateRow(index, 'productId', e.target.value)}
                         required
-                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">-- Choose Item to Load --</option>
                         {warehouseProducts.map((p) => (
@@ -304,7 +304,7 @@ export const LorryLoading: React.FC = () => {
 
                     {/* Quantity to Load */}
                     <div className="w-full sm:w-36">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
                         Quantity ({selectedProd?.unit || 'Units'})
                       </label>
                       <input
@@ -315,7 +315,7 @@ export const LorryLoading: React.FC = () => {
                         onChange={(e) => updateRow(index, 'quantity', parseInt(e.target.value, 10) || 0)}
                         required
                         placeholder="0"
-                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
 
@@ -323,7 +323,7 @@ export const LorryLoading: React.FC = () => {
                     <div className="flex items-center gap-2 self-end sm:self-center pt-2 sm:pt-4">
                       {selectedProd && (
                         <span
-                          className={`text-[10px] font-semibold px-2 py-1 rounded-lg ${selectedProd.currentStock >= row.quantity
+                          className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${selectedProd.currentStock >= row.quantity
                               ? 'bg-slate-200 text-slate-700'
                               : 'bg-rose-100 text-rose-700'
                             }`}
@@ -346,7 +346,7 @@ export const LorryLoading: React.FC = () => {
 
             {/* Notes */}
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">
                 Dispatch Notes / Loading Gate Pass Remarks
               </label>
               <input
@@ -354,7 +354,7 @@ export const LorryLoading: React.FC = () => {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="e.g. Standard morning load for Route 1 Colombo South"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
@@ -362,18 +362,18 @@ export const LorryLoading: React.FC = () => {
             <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-6">
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
                     Total Units to Load
                   </span>
-                  <span className="text-lg font-bold text-slate-900">
+                  <span className="text-xl font-bold text-slate-900 font-mono">
                     {calculateTotalUnits()} Units
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
                     Estimated Stock Value
                   </span>
-                  <span className="text-lg font-bold text-blue-600">
+                  <span className="text-xl font-bold text-blue-600 font-mono">
                     {formatMoney(calculateTotalEstimatedValue())}
                   </span>
                 </div>
