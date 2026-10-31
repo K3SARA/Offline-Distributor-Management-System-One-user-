@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   TrendingUp,
+  TrendingDown,
   DollarSign,
   PieChart,
   Percent,
@@ -91,14 +92,19 @@ export const ProfitAndLoss: React.FC = () => {
     csv += `Total Cost of Sales,${report.summary.totalCostOfSales}\n`;
     csv += `Gross Profit,${report.summary.grossProfit}\n`;
     csv += `Gross Profit Margin %,${report.summary.grossProfitMargin.toFixed(2)}%\n`;
+    csv += `Operating Expenditures (OPEX),${report.summary.totalExpenses || 0}\n`;
+    csv += `  - Fleet Running Costs,${report.summary.fleetExpenses || 0}\n`;
+    csv += `  - Warehouse Overhead,${report.summary.overheadExpenses || 0}\n`;
+    csv += `Net Operating Profit,${report.summary.netOperatingProfit !== undefined ? report.summary.netOperatingProfit : report.summary.grossProfit}\n`;
+    csv += `Net Profit Margin %,${(report.summary.netProfitMargin || 0).toFixed(2)}%\n`;
     csv += `Markup on Cost %,${report.summary.markupPercentage.toFixed(2)}%\n`;
     csv += `Cash Collected,${report.summary.cashCollected}\n`;
     csv += `Credit Receivables,${report.summary.creditReceivables}\n\n`;
 
     csv += 'CHANNEL / FLEET PROFITABILITY\n';
-    csv += 'Channel,Bills,Net Revenue,COGS,Promotional Cost,Total Cost,Gross Profit,Margin %\n';
+    csv += 'Channel,Bills,Net Revenue,COGS,Promotional Cost,Total Cost,Expenses,Gross Profit,Net Profit,Margin %\n';
     report.channelBreakdown.forEach((c) => {
-      csv += `"${c.channelName}",${c.billsCount},${c.netRevenue},${c.cogs},${c.freeIssueCost},${c.totalCost},${c.grossProfit},${c.margin.toFixed(2)}%\n`;
+      csv += `"${c.channelName}",${c.billsCount},${c.netRevenue},${c.cogs},${c.freeIssueCost},${c.totalCost},${c.expenses || 0},${c.grossProfit},${c.netProfit !== undefined ? c.netProfit : c.grossProfit},${c.margin.toFixed(2)}%\n`;
     });
     csv += '\n';
 
@@ -364,28 +370,70 @@ export const ProfitAndLoss: React.FC = () => {
                 </div>
               </div>
 
-              {/* Profit Section */}
-              <div className="py-3 space-y-2 bg-emerald-50/40 -mx-6 px-6 rounded-2xl">
-                <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wider text-emerald-800 font-sans">
-                  <span>3. Operating Earnings</span>
+              {/* Gross Profit Section */}
+              <div className="py-2.5 space-y-2 border-b border-slate-100">
+                <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wider text-slate-400 font-sans">
+                  <span>3. Gross Operating Margin</span>
                 </div>
-                <div className="flex justify-between items-center text-lg sm:text-xl font-black text-emerald-700">
-                  <span className="font-sans text-sm sm:text-base uppercase tracking-wider">Gross Profit (Operating Margin)</span>
-                  <span className="font-mono">
+                <div className="flex justify-between items-center text-base sm:text-lg font-bold text-slate-900">
+                  <span className="font-sans text-xs sm:text-sm uppercase tracking-wider">Gross Profit</span>
+                  <span className="font-mono text-emerald-600 font-black">
                     {formatMoney(report.summary.grossProfit)}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center justify-between text-xs text-slate-500 pt-0.5 font-sans">
+                  <span>Gross Margin: <strong className="text-emerald-700 font-mono">{report.summary.grossProfitMargin.toFixed(2)}%</strong></span>
+                  <span>Markup on Cost: <strong className="text-slate-800 font-mono">{report.summary.markupPercentage.toFixed(2)}%</strong></span>
+                </div>
+              </div>
+
+              {/* Operating Expenses Section */}
+              <div className="py-2.5 space-y-2">
+                <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wider text-rose-500 font-sans">
+                  <span>4. Operating Expenditures (OPEX)</span>
+                </div>
+                <div className="flex justify-between items-center pl-3 text-slate-700">
+                  <span className="flex items-center gap-1.5 font-sans text-xs">
+                    <Truck className="w-3.5 h-3.5 text-amber-500" />
+                    Fleet Running Costs (Fuel, Driver Allowance, Repairs)
+                  </span>
+                  <span className="font-semibold text-slate-900">
+                    {formatMoney(report.summary.fleetExpenses || 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pl-3 text-slate-700">
+                  <span className="flex items-center gap-1.5 font-sans text-xs">
+                    <Building2 className="w-3.5 h-3.5 text-indigo-500" />
+                    Warehouse & Admin Overhead (Rent, Power, Salaries)
+                  </span>
+                  <span className="font-semibold text-slate-900">
+                    {formatMoney(report.summary.overheadExpenses || 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pl-3 pt-1 border-t border-slate-100/80 font-bold text-rose-600">
+                  <span className="font-sans text-xs uppercase tracking-wide">Total Operating Expenses</span>
+                  <span className="text-base font-mono">
+                    -{formatMoney(report.summary.totalExpenses || 0)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Net Profit Bottom Line Section */}
+              <div className="py-3.5 space-y-2 bg-emerald-50/50 -mx-6 px-6 rounded-2xl border border-emerald-100/80">
+                <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wider text-emerald-900 font-sans">
+                  <span>5. Net Operating Profit (Bottom Line)</span>
+                </div>
+                <div className="flex justify-between items-center text-lg sm:text-2xl font-black text-emerald-700">
+                  <span className="font-sans text-sm sm:text-base uppercase tracking-wider">Net Operating Profit</span>
+                  <span className="font-mono">
+                    {formatMoney(report.summary.netOperatingProfit !== undefined ? report.summary.netOperatingProfit : report.summary.grossProfit)}
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center justify-between text-xs text-slate-600 pt-1 font-sans">
                   <span>
-                    Gross Margin:{' '}
+                    Net Profit Margin:{' '}
                     <strong className="text-emerald-700 font-mono text-sm">
-                      {report.summary.grossProfitMargin.toFixed(2)}%
-                    </strong>
-                  </span>
-                  <span>
-                    Markup on Cost:{' '}
-                    <strong className="text-slate-800 font-mono text-sm">
-                      {report.summary.markupPercentage.toFixed(2)}%
+                      {(report.summary.netProfitMargin || 0).toFixed(2)}%
                     </strong>
                   </span>
                   <span>
@@ -500,29 +548,40 @@ export const ProfitAndLoss: React.FC = () => {
                           {formatMoney(channel.freeIssueCost)}
                         </span>
                       </div>
+                      {channel.expenses !== undefined && channel.expenses > 0 && (
+                        <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-200/60">
+                          <span className="text-rose-600 font-medium flex items-center gap-1">
+                            <TrendingDown className="w-3 h-3 text-rose-500" />
+                            Route Running Costs
+                          </span>
+                          <span className="font-mono text-rose-600 font-bold">
+                            -{formatMoney(channel.expenses)}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Bottom Highlighted Profit Pill */}
                     <div
                       className={`rounded-2xl px-3.5 py-2.5 flex items-center justify-between transition-colors ${
-                        isProfitable
+                        (channel.netProfit !== undefined ? channel.netProfit : channel.grossProfit) >= 0
                           ? 'bg-emerald-50/90 border border-emerald-200/80'
                           : 'bg-rose-50/90 border border-rose-200/80'
                       }`}
                     >
                       <span
                         className={`text-xs font-bold uppercase tracking-wider ${
-                          isProfitable ? 'text-emerald-800' : 'text-rose-800'
+                          (channel.netProfit !== undefined ? channel.netProfit : channel.grossProfit) >= 0 ? 'text-emerald-800' : 'text-rose-800'
                         }`}
                       >
-                        Gross Profit
+                        Net Channel Margin
                       </span>
                       <span
                         className={`font-mono text-base font-black ${
-                          isProfitable ? 'text-emerald-700' : 'text-rose-600'
+                          (channel.netProfit !== undefined ? channel.netProfit : channel.grossProfit) >= 0 ? 'text-emerald-700' : 'text-rose-600'
                         }`}
                       >
-                        {formatMoney(channel.grossProfit)}
+                        {formatMoney(channel.netProfit !== undefined ? channel.netProfit : channel.grossProfit)}
                       </span>
                     </div>
                   </div>

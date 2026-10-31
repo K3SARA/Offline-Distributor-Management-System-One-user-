@@ -11,7 +11,9 @@ import {
   SystemSettings,
   ProfitAndLossReport,
   Supplier,
-  PurchaseOrder
+  PurchaseOrder,
+  Expense,
+  ExpenseSummary
 } from '../types';
 
 // Dynamic API URL: uses relative '/api' on Railway / production web,
@@ -159,5 +161,36 @@ export const PurchaseOrderService = {
     notes?: string;
     items: { productId: string; quantity: number; costPrice: number }[];
   }) => api.post<PurchaseOrder>('/purchase-orders', payload).then(r => r.data)
+};
+
+export const ExpenseService = {
+  getAll: (params?: {
+    from?: string;
+    to?: string;
+    category?: string;
+    lorryId?: string;
+    paymentMethod?: string;
+    search?: string;
+  }) => api.get<Expense[]>('/expenses', { params }).then(r => r.data),
+  getSummary: (from?: string, to?: string) =>
+    api.get<ExpenseSummary>('/expenses/summary', { params: { from, to } }).then(r => r.data),
+  getById: (id: string) =>
+    api.get<Expense>(`/expenses/${id}`).then(r => r.data),
+  create: (data: {
+    category: string;
+    title: string;
+    amount: number;
+    date?: string;
+    paymentMethod?: string;
+    referenceNumber?: string;
+    paidTo?: string;
+    notes?: string;
+    lorryId?: string;
+    loadingId?: string;
+  }) => api.post<Expense>('/expenses', data).then(r => r.data),
+  update: (id: string, data: Partial<Expense>) =>
+    api.put<Expense>(`/expenses/${id}`, data).then(r => r.data),
+  delete: (id: string) =>
+    api.delete<{ success: boolean; message: string }>(`/expenses/${id}`).then(r => r.data)
 };
 

@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   TrendingUp,
+  TrendingDown,
   Truck,
   AlertTriangle,
   Coins,
@@ -25,6 +26,7 @@ interface DashboardProps {
   onNavigateToBillEntry: () => void;
   onNavigateToSettlement: () => void;
   onNavigateToInventory: () => void;
+  onNavigateToExpenses?: () => void;
   onViewInvoice: (order: Order) => void;
 }
 
@@ -33,6 +35,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onNavigateToBillEntry,
   onNavigateToSettlement,
   onNavigateToInventory,
+  onNavigateToExpenses,
   onViewInvoice
 }) => {
   const { formatMoney } = useCurrency();
@@ -223,6 +226,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       {formatMoney(lorry.todaySales)}
                     </span>
                   </div>
+                  {lorry.todayExpenses !== undefined && lorry.todayExpenses > 0 && (
+                    <div className="col-span-2 pt-2 border-t border-slate-200/70 flex items-center justify-between text-[11px]">
+                      <span className="text-slate-500 font-semibold flex items-center gap-1">
+                        <TrendingDown className="w-3.5 h-3.5 text-rose-500" />
+                        Route Expenses
+                      </span>
+                      <span className="font-mono font-bold text-rose-600">
+                        -{formatMoney(lorry.todayExpenses)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -296,14 +310,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="bg-white border border-slate-200/80 p-5 rounded-3xl shadow-2xs hover:shadow-sm transition">
             <div className="flex items-center justify-between text-slate-400 mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                {getPresetLabel()} Credit
+                {getPresetLabel()} Expenses
               </span>
-              <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
-                <TrendingUp className="w-4.5 h-4.5" />
-              </div>
+              {onNavigateToExpenses ? (
+                <button
+                  onClick={onNavigateToExpenses}
+                  className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition"
+                  title="View Expenses Ledger"
+                >
+                  <TrendingDown className="w-4.5 h-4.5" />
+                </button>
+              ) : (
+                <div className="p-2 bg-rose-50 text-rose-600 rounded-xl">
+                  <TrendingDown className="w-4.5 h-4.5" />
+                </div>
+              )}
             </div>
-            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 font-mono mt-1">
-              {formatMoney(stats.creditToday)}
+            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-rose-600 font-mono mt-1">
+              {formatMoney(stats.expensesToday || 0)}
             </div>
           </div>
 

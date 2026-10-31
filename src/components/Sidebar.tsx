@@ -12,6 +12,7 @@ import {
   Coins,
   Settings as SettingsIcon,
   TrendingUp,
+  TrendingDown,
   Building2,
   X
 } from 'lucide-react';
@@ -31,7 +32,7 @@ interface SidebarSection {
     label: string;
     icon: React.ComponentType<{ className?: string }>;
     badge?: string;
-    badgeTone?: 'step' | 'inward' | 'pnl';
+    badgeTone?: 'step' | 'inward' | 'pnl' | 'expense';
   }[];
 }
 
@@ -64,6 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'Finance & Management',
       items: [
         { id: 'customers', label: 'Clients & Accounts', icon: Users },
+        { id: 'expenses', label: 'Expenses & Opex', icon: TrendingDown, badge: 'Outflow', badgeTone: 'expense' },
         { id: 'pnl', label: 'Profit & Loss', icon: TrendingUp, badge: 'P&L', badgeTone: 'pnl' },
         { id: 'reports', label: 'Reports & Audit', icon: BarChart3 },
         { id: 'settings', label: 'Fleet & Settings', icon: SettingsIcon }
@@ -78,7 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  const getBadgeClass = (isActive: boolean, tone?: 'step' | 'inward' | 'pnl') => {
+  const getBadgeClass = (isActive: boolean, tone?: 'step' | 'inward' | 'pnl' | 'expense') => {
     if (isActive) {
       return 'bg-white/20 text-white border border-white/30 backdrop-blur-xs';
     }
@@ -87,6 +89,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         return 'bg-emerald-50 text-emerald-700 border border-emerald-200/70';
       case 'pnl':
         return 'bg-indigo-50 text-indigo-700 border border-indigo-200/70';
+      case 'expense':
+        return 'bg-rose-50 text-rose-700 border border-rose-200/70';
       case 'step':
       default:
         return 'bg-slate-100 text-slate-600 border border-slate-200/70';

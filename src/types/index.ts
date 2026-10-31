@@ -61,6 +61,7 @@ export interface LorryLoading {
   creditGiven: number;
   settledAt?: string | null;
   items: LorryLoadingItem[];
+  expenses?: Expense[];
   createdAt: string;
 }
 
@@ -216,6 +217,7 @@ export interface FleetLorryStatus {
   floatingStockUnits: number;
   todaySales: number;
   todayCash: number;
+  todayExpenses?: number;
 }
 
 export interface DashboardStats {
@@ -225,6 +227,8 @@ export interface DashboardStats {
   ordersTodayCount: number;
   lowStockCount: number;
   totalOutstanding: number;
+  expensesToday: number;
+  netProfitToday: number;
   fleetStatus: FleetLorryStatus[];
   recentOrders: Order[];
   lowStockItems: Product[];
@@ -241,6 +245,59 @@ export interface SystemSettings {
   defaultCurrency: string;
   defaultCreditLimit: number;
   lowStockThreshold: number;
+}
+
+export type ExpenseCategory =
+  | 'FUEL'
+  | 'VEHICLE_MAINTENANCE'
+  | 'DRIVER_ALLOWANCE'
+  | 'RENT'
+  | 'UTILITIES'
+  | 'SALARIES'
+  | 'PACKAGING'
+  | 'PETTY_CASH'
+  | 'OTHER';
+
+export interface Expense {
+  id: string;
+  expenseNumber: string;
+  category: ExpenseCategory;
+  title: string;
+  amount: number;
+  date: string;
+  paymentMethod: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE';
+  referenceNumber?: string | null;
+  paidTo?: string | null;
+  notes?: string | null;
+  lorryId?: string | null;
+  lorry?: Lorry | null;
+  loadingId?: string | null;
+  loading?: LorryLoading | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExpenseSummary {
+  totalAmount: number;
+  totalCount: number;
+  fleetExpenses: number;
+  overheadExpenses: number;
+  byCategory: Array<{
+    category: ExpenseCategory;
+    amount: number;
+    count: number;
+  }>;
+  byLorry: Array<{
+    lorryId: string;
+    vehicleNumber: string;
+    driverName: string;
+    amount: number;
+    count: number;
+  }>;
+  byPaymentMethod: Array<{
+    paymentMethod: string;
+    amount: number;
+  }>;
 }
 
 export interface ProfitAndLossReport {
@@ -263,7 +320,17 @@ export interface ProfitAndLossReport {
     totalOrdersCount: number;
     cashCollected: number;
     creditReceivables: number;
+    totalExpenses: number;
+    netOperatingProfit: number;
+    netProfitMargin: number;
+    fleetExpenses: number;
+    overheadExpenses: number;
   };
+  expensesByCategory: Array<{
+    category: ExpenseCategory;
+    amount: number;
+    count: number;
+  }>;
   channelBreakdown: Array<{
     id: string;
     channelName: string;
@@ -275,6 +342,8 @@ export interface ProfitAndLossReport {
     totalCost: number;
     grossProfit: number;
     margin: number;
+    expenses?: number;
+    netProfit?: number;
   }>;
   productBreakdown: Array<{
     productId: string;
@@ -299,6 +368,8 @@ export interface ProfitAndLossReport {
     cost: number;
     profit: number;
     margin: number;
+    expenses?: number;
   }>;
 }
+
 

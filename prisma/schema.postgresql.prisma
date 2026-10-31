@@ -84,6 +84,7 @@ model Lorry {
   loadings    LorryLoading[]
   lorryStocks LorryStock[]
   orders      Order[]
+  expenses    Expense[]
 
   @@index([vehicleNumber])
   @@index([routeId])
@@ -125,7 +126,8 @@ model LorryLoading {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  items LorryLoadingItem[]
+  items    LorryLoadingItem[]
+  expenses Expense[]
 
   @@index([lorryId])
   @@index([date])
@@ -292,4 +294,32 @@ model PurchaseOrderItem {
 
   @@index([purchaseOrderId])
   @@index([productId])
+}
+
+// --------------------------------------------------------
+// 6. OPERATING EXPENDITURES & EXPENSES (OPEX)
+// --------------------------------------------------------
+model Expense {
+  id              String        @id @default(uuid())
+  expenseNumber   String        @unique // e.g. "EXP-20261031-0001"
+  category        String        // FUEL, VEHICLE_MAINTENANCE, DRIVER_ALLOWANCE, RENT, UTILITIES, SALARIES, PACKAGING, PETTY_CASH, OTHER
+  title           String        // Short summary / title
+  amount          Float
+  date            DateTime      @default(now())
+  paymentMethod   String        @default("CASH") // CASH, BANK_TRANSFER, CHEQUE
+  referenceNumber String?       // Receipt / Bill / Cheque #
+  paidTo          String?       // Vendor or Payee
+  notes           String?
+  lorryId         String?
+  lorry           Lorry?        @relation(fields: [lorryId], references: [id], onDelete: SetNull)
+  loadingId       String?
+  loading         LorryLoading? @relation(fields: [loadingId], references: [id], onDelete: SetNull)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([expenseNumber])
+  @@index([category])
+  @@index([date])
+  @@index([lorryId])
+  @@index([loadingId])
 }

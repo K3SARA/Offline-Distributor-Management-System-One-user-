@@ -9,10 +9,15 @@ import {
   DollarSign,
   AlertTriangle,
   History,
-  ArrowRight
+  ArrowRight,
+  TrendingDown,
+  Plus,
+  X,
+  Fuel,
+  Receipt
 } from 'lucide-react';
-import { Lorry, LorryLoading } from '../types';
-import { LorryService } from '../services/api';
+import { Lorry, LorryLoading, ExpenseCategory } from '../types';
+import { LorryService, ExpenseService } from '../services/api';
 import { useCurrency } from '../context/CurrencyContext';
 
 interface ReturnRow {
@@ -34,6 +39,14 @@ export const LorrySettlement: React.FC = () => {
   const [returnRows, setReturnRows] = useState<ReturnRow[]>([]);
   const [cashHandover, setCashHandover] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+
+  // Quick Route Expense Modal
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState<boolean>(false);
+  const [expCategory, setExpCategory] = useState<ExpenseCategory>('FUEL');
+  const [expTitle, setExpTitle] = useState<string>('');
+  const [expAmount, setExpAmount] = useState<string>('');
+  const [expRef, setExpRef] = useState<string>('');
+  const [expSaving, setExpSaving] = useState<boolean>(false);
 
   const [loading, setLoading] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -80,8 +93,10 @@ export const LorrySettlement: React.FC = () => {
             returnedQty: expected // Pre-populate with expected remaining
           };
         });
+        const expSum = active.expenses?.reduce((acc, e) => acc + e.amount, 0) || 0;
+        const netCash = Math.max(0, active.cashCollected - expSum);
         setReturnRows(rows);
-        setCashHandover(active.cashCollected.toString());
+        setCashHandover(netCash.toString());
       } else {
         setReturnRows([]);
         setCashHandover('');
@@ -115,8 +130,45 @@ export const LorrySettlement: React.FC = () => {
   };
 
   const totalDiscrepancy = calculateTotalDiscrepancy();
-  const expectedCash = activeLoading?.cashCollected || 0;
-  const cashDifference = (parseFloat(cashHandover) || 0) - expectedCash;
+  const totalRouteExpenses = activeLoading?.expenses?.reduce((acc, e) => acc + e.amount, 0) || 0;
+  const netExpectedCash = Math.max(0, (activeLoading?.cashCollected || 0) - totalRouteExpenses);
+  const cashDifference = (parseFloat(cashHandover) || 0) - netExpectedCash;
+
+  const handleAddRouteExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amountVal = parseFloat(expAmount);
+    if (!expTitle.trim() || isNaN(amountVal) || amountVal <= 0) {
+      setErrorMessage('Please enter a valid title and positive amount for the route expense.');
+      return;
+    }
+
+    try {
+      setExpSaving(true);
+      await ExpenseService.create({
+        category: expCategory,
+        title: expTitle.trim(),
+        amount: amountVal,
+        date: activeLoading?.date || new Date().toISOString(),
+        paymentMethod: 'CASH',
+        referenceNumber: expRef.trim() || undefined,
+        lorryId: selectedLorryId,
+        loadingId: activeLoading?.id,
+        paidTo: selectedLorry?.driverName || undefined,
+        notes: `Route expense during trip ${activeLoading?.loadingNumber}`
+      });
+
+      setSuccessMessage(`Route expense "${expTitle}" recorded and deducted from cash handover.`);
+      setIsExpenseModalOpen(false);
+      setExpTitle('');
+      setExpAmount('');
+      setExpRef('');
+      await fetchLoading(selectedLorryId);
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.error || 'Failed to record route expense.');
+    } finally {
+      setExpSaving(false);
+    }
+  };
 
   const handleCompleteSettlement = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -240,12 +292,16 @@ export const LorrySettlement: React.FC = () => {
 
             <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-                Expected Cash
+                Net Expected Cash
               </span>
               <span className="text-lg sm:text-2xl font-bold text-blue-600 mt-1 block font-mono">
-                {formatMoney(activeLoading.cashCollected)}
+                {formatMoney(netExpectedCash)}
               </span>
-              <span className="text-xs text-slate-500 truncate block mt-0.5">Credit: {formatMoney(activeLoading.creditGiven)}</span>
+              <span className="text-xs text-slate-500 truncate block mt-0.5">
+                {totalRouteExpenses > 0
+                  ? `Billed ${formatMoney(activeLoading.cashCollected)} - ${formatMoney(totalRouteExpenses)} exp`
+                  : `Credit: ${formatMoney(activeLoading.creditGiven)}`}
+              </span>
             </div>
 
             <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs">
@@ -341,25 +397,95 @@ export const LorrySettlement: React.FC = () => {
             </div>
           </div>
 
+          {/* Route Expenses Reconciliation Panel */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs p-4 sm:p-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <TrendingDown className="w-4 h-4 text-rose-600" />
+                  Route Running Expenses & Fuel Slips
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Fuel refills and driver meal allowances deducted from billed cash collections.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsExpenseModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-semibold border border-rose-200/80 transition"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Route Slip</span>
+              </button>
+            </div>
+
+            {activeLoading.expenses && activeLoading.expenses.length > 0 ? (
+              <div className="divide-y divide-slate-100 border border-slate-100 rounded-2xl overflow-hidden text-xs">
+                {activeLoading.expenses.map((exp) => (
+                  <div key={exp.id} className="p-3 bg-slate-50/60 flex items-center justify-between">
+                    <div>
+                      <span className="font-semibold text-slate-800 block">{exp.title}</span>
+                      <span className="text-[11px] text-slate-400 font-mono">
+                        {exp.expenseNumber} {exp.referenceNumber ? `• Ref #${exp.referenceNumber}` : ''}
+                      </span>
+                    </div>
+                    <span className="font-mono font-bold text-rose-600 text-sm">
+                      -{formatMoney(exp.amount)}
+                    </span>
+                  </div>
+                ))}
+                <div className="p-3 bg-slate-100/80 flex items-center justify-between font-bold text-slate-900">
+                  <span>Total Route Expenses Deducted</span>
+                  <span className="font-mono text-rose-600 text-sm">
+                    -{formatMoney(totalRouteExpenses)}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 bg-slate-50 rounded-2xl text-xs text-slate-500 flex items-center justify-between">
+                <span>No route fuel/meals recorded for this trip.</span>
+                <span className="font-mono text-slate-400">Rs. 0.00</span>
+              </div>
+            )}
+          </div>
+
           {/* Cash Handover & Closing Remarks */}
           <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xs p-4 sm:p-6 space-y-4">
             <h3 className="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider">
               Cash Handover & Audit Confirmation
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:gap-4">
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
-                  Expected Cash From Bills
+                  Billed Cash Sales
                 </label>
-                <div className="px-3.5 py-2.5 bg-slate-100 rounded-xl font-mono font-bold text-slate-800 text-sm sm:text-base">
-                  {formatMoney(expectedCash)}
+                <div className="px-3.5 py-2.5 bg-slate-100 rounded-xl font-mono font-bold text-slate-800 text-sm">
+                  {formatMoney(activeLoading.cashCollected)}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5 text-rose-600">
+                  Less: Route Expenses
+                </label>
+                <div className="px-3.5 py-2.5 bg-rose-50 border border-rose-200/60 rounded-xl font-mono font-bold text-rose-700 text-sm">
+                  -{formatMoney(totalRouteExpenses)}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5 text-blue-600">
+                  Net Expected Handover
+                </label>
+                <div className="px-3.5 py-2.5 bg-blue-50 border border-blue-200/60 rounded-xl font-mono font-bold text-blue-700 text-sm">
+                  {formatMoney(netExpectedCash)}
                 </div>
               </div>
 
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
-                  Driver Handover Cash Amount *
+                  Driver Handover Cash *
                 </label>
                 <input
                   type="number"
@@ -368,28 +494,25 @@ export const LorrySettlement: React.FC = () => {
                   onChange={(e) => setCashHandover(e.target.value)}
                   placeholder="0.00"
                   required
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 font-mono font-bold text-slate-900 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 font-mono font-bold text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+            </div>
 
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
-                  Cash Discrepancy
-                </label>
-                <div
-                  className={`px-3.5 py-2.5 rounded-xl font-mono font-bold text-sm sm:text-base ${cashDifference < 0
-                      ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                      : cashDifference > 0
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        : 'bg-slate-100 text-slate-800'
-                    }`}
-                >
-                  {cashDifference < 0
-                    ? `Shortage: -${formatMoney(Math.abs(cashDifference))}`
+            <div>
+              <div
+                className={`px-3.5 py-2.5 rounded-xl font-mono font-bold text-sm ${cashDifference < 0
+                    ? 'bg-rose-50 text-rose-700 border border-rose-200'
                     : cashDifference > 0
-                      ? `Excess: +${formatMoney(cashDifference)}`
-                      : 'Exact Handover ($0.00 Diff)'}
-                </div>
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-slate-100 text-slate-800'
+                  }`}
+              >
+                {cashDifference < 0
+                  ? `Cash Shortage: -${formatMoney(Math.abs(cashDifference))}`
+                  : cashDifference > 0
+                    ? `Cash Excess: +${formatMoney(cashDifference)}`
+                    : 'Exact Cash Handover ($0.00 Discrepancy)'}
               </div>
             </div>
 
@@ -427,6 +550,111 @@ export const LorrySettlement: React.FC = () => {
           <p className="text-xs text-slate-400 max-w-sm mx-auto">
             This lorry has either not been loaded this morning, or has already completed and settled its daily run.
           </p>
+        </div>
+      )}
+
+      {/* Quick Route Expense Modal */}
+      {isExpenseModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xl max-w-md w-full overflow-hidden p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                  Record Route Fuel / Expense
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Lorry {selectedLorry?.vehicleNumber} • Gate Pass {activeLoading?.loadingNumber}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsExpenseModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddRouteExpense} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Category
+                </label>
+                <select
+                  value={expCategory}
+                  onChange={(e) => setExpCategory(e.target.value as any)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-rose-500"
+                >
+                  <option value="FUEL">Fuel & Diesel Refill</option>
+                  <option value="DRIVER_ALLOWANCE">Driver & Crew Meal Allowance</option>
+                  <option value="VEHICLE_MAINTENANCE">Puncture / Urgent Repair</option>
+                  <option value="OTHER">Tolls / Other Expense</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Description / Title *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Diesel 30L top-up"
+                  value={expTitle}
+                  onChange={(e) => setExpTitle(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-rose-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Amount (Cash) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    placeholder="0.00"
+                    value={expAmount}
+                    onChange={(e) => setExpAmount(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold outline-none focus:border-rose-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Slip / Receipt #
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. PETRO-1234"
+                    value={expRef}
+                    onChange={(e) => setExpRef(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-rose-500"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsExpenseModalOpen(false)}
+                  className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={expSaving}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold transition shadow-sm disabled:opacity-50"
+                >
+                  {expSaving ? 'Recording...' : 'Deduct from Handover'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

@@ -76,6 +76,7 @@ model Lorry {
   loadings    LorryLoading[]
   lorryStocks LorryStock[]
   orders      Order[]
+  expenses    Expense[]
 }
 
 // Real-time floating inventory held on each lorry
@@ -112,7 +113,8 @@ model LorryLoading {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  items LorryLoadingItem[]
+  items    LorryLoadingItem[]
+  expenses Expense[]
 }
 
 model LorryLoadingItem {
@@ -247,4 +249,26 @@ model PurchaseOrderItem {
   quantity        Int // Units received into warehouse stock
   costPrice       Float // Purchase price per unit
   lineTotal       Float // quantity * costPrice
+}
+
+// --------------------------------------------------------
+// 6. OPERATING EXPENDITURES & EXPENSES (OPEX)
+// --------------------------------------------------------
+model Expense {
+  id              String        @id @default(uuid())
+  expenseNumber   String        @unique // e.g. "EXP-20261031-0001"
+  category        String        // FUEL, VEHICLE_MAINTENANCE, DRIVER_ALLOWANCE, RENT, UTILITIES, SALARIES, PACKAGING, PETTY_CASH, OTHER
+  title           String        // Short summary / title
+  amount          Float
+  date            DateTime      @default(now())
+  paymentMethod   String        @default("CASH") // CASH, BANK_TRANSFER, CHEQUE
+  referenceNumber String?       // Receipt / Bill / Cheque #
+  paidTo          String?       // Vendor or Payee
+  notes           String?
+  lorryId         String?
+  lorry           Lorry?        @relation(fields: [lorryId], references: [id], onDelete: SetNull)
+  loadingId       String?
+  loading         LorryLoading? @relation(fields: [loadingId], references: [id], onDelete: SetNull)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }

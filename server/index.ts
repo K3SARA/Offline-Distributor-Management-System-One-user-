@@ -807,7 +807,8 @@ app.get('/api/lorries/:id/current-loading', async (req: Request, res: Response) 
       orderBy: { date: 'desc' },
       include: {
         lorry: { include: { route: true } },
-        items: { include: { product: true } }
+        items: { include: { product: true } },
+        expenses: true
       }
     });
 
@@ -1537,7 +1538,7 @@ app.get('/api/reports/dashboard-stats', async (req: Request, res: Response) => {
     const startDate = from ? new Date(from as string) : new Date(new Date().setHours(0, 0, 0, 0));
     const endDate = to ? new Date(to as string) : new Date(new Date().setHours(23, 59, 59, 999));
 
-    const [periodOrders, allProducts, customerBalances, lorries] = await Promise.all([
+    const [periodOrders, allProducts, customerBalances, lorries, periodExpenses] = await Promise.all([
       prisma.order.findMany({
         where: {
           createdAt: {
@@ -1565,7 +1566,15 @@ app.get('/api/reports/dashboard-stats', async (req: Request, res: Response) => {
                 lte: endDate
               }
             },
-            include: { items: true }
+            include: { items: true, expenses: true }
+          }
+        }
+      }),
+      prisma.expense.findMany({
+        where: {
+          date: {
+            gte: startDate,
+            lte: endDate
           }
         }
       })
@@ -1576,11 +1585,16 @@ app.get('/api/reports/dashboard-stats', async (req: Request, res: Response) => {
     const revenueToday = validOrders.reduce((acc, order) => acc + order.netTotal, 0);
     const cashToday = validOrders.reduce((acc, order) => acc + order.cashReceived, 0);
     const creditToday = revenueToday - cashToday;
+    const expensesToday = periodExpenses.reduce((acc, exp) => acc + exp.amount, 0);
+    const netProfitToday = revenueToday - expensesToday;
 
     // Lorry fleet status breakdown
     const fleetStatus = lorries.map(l => {
       const activeLoading = l.loadings[0];
       const floatingStockUnits = l.lorryStocks.reduce((a, b) => a + b.quantity, 0);
+      const lorryExpenses = periodExpenses.filter(e => e.lorryId === l.id);
+      const todayExpenses = lorryExpenses.reduce((acc, e) => acc + e.amount, 0);
+
       return {
         id: l.id,
         vehicleNumber: l.vehicleNumber,
@@ -1589,7 +1603,8 @@ app.get('/api/reports/dashboard-stats', async (req: Request, res: Response) => {
         status: activeLoading ? (activeLoading.status === 'SETTLED' ? 'SETTLED' : 'ACTIVE') : 'READY_TO_LOAD',
         floatingStockUnits,
         todaySales: activeLoading?.totalSalesAmount || 0,
-        todayCash: activeLoading?.cashCollected || 0
+        todayCash: activeLoading?.cashCollected || 0,
+        todayExpenses
       };
     });
 
@@ -1597,6 +1612,8 @@ app.get('/api/reports/dashboard-stats', async (req: Request, res: Response) => {
       revenueToday,
       cashToday,
       creditToday,
+      expensesToday,
+      netProfitToday,
       ordersTodayCount: validOrders.length,
       lowStockCount: lowStockProducts.length,
       totalOutstanding: customerBalances._sum.outstandingBalance || 0,
@@ -1800,7 +1817,7 @@ app.get('/api/reports/profit-and-loss', async (req: Request, res: Response) => {
     const startDate = from ? new Date(from as string) : new Date(new Date().setHours(0, 0, 0, 0));
     const endDate = to ? new Date(to as string) : new Date(new Date().setHours(23, 59, 59, 999));
 
-    const [orders, lorries] = await Promise.all([
+    const [orders, lorries, periodExpenses] = await Promise.all([
       prisma.order.findMany({
         where: {
           status: { not: 'CANCELLED' },
@@ -1823,6 +1840,15 @@ app.get('/api/reports/profit-and-loss', async (req: Request, res: Response) => {
       }),
       prisma.lorry.findMany({
         include: { route: true }
+      }),
+      prisma.expense.findMany({
+        where: {
+          date: {
+            gte: startDate,
+            lte: endDate
+          }
+        },
+        include: { lorry: true }
       })
     ]);
 
@@ -1988,10 +2014,51 @@ app.get('/api/reports/profit-and-loss', async (req: Request, res: Response) => {
     const markupPercentage = totalCostOfSales > 0 ? (grossProfit / totalCostOfSales) * 100 : 0;
     const creditReceivables = Math.max(0, netRevenue - cashCollected);
 
-    // Compute margins for channels
+    // Process Operating Expenditures (OPEX)
+    const totalExpenses = periodExpenses.reduce((acc, exp) => acc + exp.amount, 0);
+    const netOperatingProfit = grossProfit - totalExpenses;
+    const netProfitMargin = netRevenue > 0 ? (netOperatingProfit / netRevenue) * 100 : 0;
+
+    let fleetExpenses = 0;
+    let overheadExpenses = 0;
+    const expenseCategoryMap = new Map<string, { category: string; amount: number; count: number }>();
+
+    for (const exp of periodExpenses) {
+      let catStat = expenseCategoryMap.get(exp.category);
+      if (!catStat) {
+        catStat = { category: exp.category, amount: 0, count: 0 };
+        expenseCategoryMap.set(exp.category, catStat);
+      }
+      catStat.amount += exp.amount;
+      catStat.count += 1;
+
+      if (exp.lorryId) {
+        fleetExpenses += exp.amount;
+        const channel = channelMap.get(exp.lorryId);
+        if (channel) {
+          (channel as any).expenses = ((channel as any).expenses || 0) + exp.amount;
+        }
+      } else {
+        overheadExpenses += exp.amount;
+      }
+
+      // Add expense to daily breakdown
+      const dateKey = exp.date.toISOString().slice(0, 10);
+      let dayStat = dailyMap.get(dateKey);
+      if (!dayStat) {
+        dayStat = { date: dateKey, revenue: 0, cost: 0, profit: 0, margin: 0 };
+        dailyMap.set(dateKey, dayStat);
+      }
+      (dayStat as any).expenses = ((dayStat as any).expenses || 0) + exp.amount;
+    }
+
+    // Compute margins and net channel profit for channels
     const channelBreakdown = Array.from(channelMap.values()).map(c => {
       c.grossProfit = c.netRevenue - c.totalCost;
       c.margin = c.netRevenue > 0 ? (c.grossProfit / c.netRevenue) * 100 : 0;
+      const channelExp = (c as any).expenses || 0;
+      (c as any).expenses = channelExp;
+      (c as any).netProfit = c.grossProfit - channelExp;
       return c;
     });
 
@@ -2028,14 +2095,318 @@ app.get('/api/reports/profit-and-loss', async (req: Request, res: Response) => {
         totalFreeUnits,
         totalOrdersCount: orders.length,
         cashCollected,
-        creditReceivables
+        creditReceivables,
+        totalExpenses,
+        netOperatingProfit,
+        netProfitMargin,
+        fleetExpenses,
+        overheadExpenses
       },
+      expensesByCategory: Array.from(expenseCategoryMap.values()),
       channelBreakdown,
       productBreakdown,
       dailyBreakdown
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ========================================================
+// 9. EXPENSES & OPERATIONAL EXPENDITURES (OPEX)
+// ========================================================
+
+// List expenses with date, category, lorry, payment method & search filters
+app.get('/api/expenses', async (req: Request, res: Response) => {
+  try {
+    const { from, to, category, lorryId, paymentMethod, search } = req.query;
+    const where: any = {};
+
+    if (from || to) {
+      where.date = {
+        gte: from ? new Date(from as string) : undefined,
+        lte: to ? new Date(to as string) : undefined
+      };
+    }
+
+    if (category && typeof category === 'string' && category !== 'ALL') {
+      where.category = category;
+    }
+
+    if (lorryId && typeof lorryId === 'string' && lorryId !== 'ALL') {
+      where.lorryId = lorryId === 'OVERHEAD' ? null : lorryId;
+    }
+
+    if (paymentMethod && typeof paymentMethod === 'string' && paymentMethod !== 'ALL') {
+      where.paymentMethod = paymentMethod;
+    }
+
+    if (search && typeof search === 'string') {
+      where.OR = [
+        { title: { contains: search } },
+        { expenseNumber: { contains: search } },
+        { referenceNumber: { contains: search } },
+        { paidTo: { contains: search } },
+        { notes: { contains: search } }
+      ];
+    }
+
+    const expenses = await prisma.expense.findMany({
+      where,
+      include: {
+        lorry: {
+          include: { route: true }
+        },
+        loading: true
+      },
+      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }]
+    });
+
+    res.json(expenses);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Expense Summary KPIs & Category Breakdown
+app.get('/api/expenses/summary', async (req: Request, res: Response) => {
+  try {
+    const { from, to } = req.query;
+    const startDate = from ? new Date(from as string) : new Date(new Date().setHours(0, 0, 0, 0));
+    const endDate = to ? new Date(to as string) : new Date(new Date().setHours(23, 59, 59, 999));
+
+    const [expenses, lorries] = await Promise.all([
+      prisma.expense.findMany({
+        where: {
+          date: {
+            gte: startDate,
+            lte: endDate
+          }
+        },
+        include: { lorry: true }
+      }),
+      prisma.lorry.findMany()
+    ]);
+
+    const totalAmount = expenses.reduce((acc, exp) => acc + exp.amount, 0);
+    const totalCount = expenses.length;
+
+    let fleetExpenses = 0;
+    let overheadExpenses = 0;
+
+    const categoryMap = new Map<string, { category: string; amount: number; count: number }>();
+    const lorryMap = new Map<string, { lorryId: string; vehicleNumber: string; driverName: string; amount: number; count: number }>();
+    const paymentMap = new Map<string, number>();
+
+    for (const l of lorries) {
+      lorryMap.set(l.id, {
+        lorryId: l.id,
+        vehicleNumber: l.vehicleNumber,
+        driverName: l.driverName,
+        amount: 0,
+        count: 0
+      });
+    }
+
+    for (const exp of expenses) {
+      // By category
+      let cat = categoryMap.get(exp.category);
+      if (!cat) {
+        cat = { category: exp.category, amount: 0, count: 0 };
+        categoryMap.set(exp.category, cat);
+      }
+      cat.amount += exp.amount;
+      cat.count += 1;
+
+      // By lorry / fleet
+      if (exp.lorryId) {
+        fleetExpenses += exp.amount;
+        let lStat = lorryMap.get(exp.lorryId);
+        if (lStat) {
+          lStat.amount += exp.amount;
+          lStat.count += 1;
+        }
+      } else {
+        overheadExpenses += exp.amount;
+      }
+
+      // By payment method
+      const currentPm = paymentMap.get(exp.paymentMethod) || 0;
+      paymentMap.set(exp.paymentMethod, currentPm + exp.amount);
+    }
+
+    res.json({
+      totalAmount,
+      totalCount,
+      fleetExpenses,
+      overheadExpenses,
+      byCategory: Array.from(categoryMap.values()).sort((a, b) => b.amount - a.amount),
+      byLorry: Array.from(lorryMap.values()),
+      byPaymentMethod: Array.from(paymentMap.entries()).map(([paymentMethod, amount]) => ({
+        paymentMethod,
+        amount
+      }))
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get single expense
+app.get('/api/expenses/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const expense = await prisma.expense.findUnique({
+      where: { id },
+      include: {
+        lorry: { include: { route: true } },
+        loading: true
+      }
+    });
+
+    if (!expense) {
+      return res.status(404).json({ error: 'Expense record not found.' });
+    }
+
+    res.json(expense);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Record a new Expense
+app.post('/api/expenses', async (req: Request, res: Response) => {
+  try {
+    const {
+      category,
+      title,
+      amount,
+      date,
+      paymentMethod,
+      referenceNumber,
+      paidTo,
+      notes,
+      lorryId,
+      loadingId
+    } = req.body;
+
+    if (!category || !title || amount === undefined || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+      return res.status(400).json({ error: 'Valid category, title, and positive amount are required.' });
+    }
+
+    const expenseDate = date ? new Date(date) : new Date();
+    const todayStr = expenseDate.toISOString().slice(0, 10).replace(/-/g, '');
+    const countToday = await prisma.expense.count({
+      where: {
+        date: {
+          gte: new Date(new Date(expenseDate).setHours(0, 0, 0, 0)),
+          lte: new Date(new Date(expenseDate).setHours(23, 59, 59, 999))
+        }
+      }
+    });
+    const expenseNumber = `EXP-${todayStr}-${(countToday + 1).toString().padStart(4, '0')}`;
+
+    // Auto-link active loading if lorryId is specified without loadingId
+    let finalLoadingId = loadingId || null;
+    if (lorryId && !finalLoadingId) {
+      const activeLoading = await prisma.lorryLoading.findFirst({
+        where: {
+          lorryId,
+          status: { in: ['LOADED', 'IN_TRANSIT'] }
+        },
+        orderBy: { date: 'desc' }
+      });
+      if (activeLoading) {
+        finalLoadingId = activeLoading.id;
+      }
+    }
+
+    const created = await prisma.expense.create({
+      data: {
+        expenseNumber,
+        category: category.trim().toUpperCase(),
+        title: title.trim(),
+        amount: parseFloat(amount),
+        date: expenseDate,
+        paymentMethod: paymentMethod || 'CASH',
+        referenceNumber: referenceNumber?.trim() || null,
+        paidTo: paidTo?.trim() || null,
+        notes: notes?.trim() || null,
+        lorryId: lorryId || null,
+        loadingId: finalLoadingId
+      },
+      include: {
+        lorry: { include: { route: true } },
+        loading: true
+      }
+    });
+
+    res.status(201).json(created);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Update an Expense
+app.put('/api/expenses/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const {
+      category,
+      title,
+      amount,
+      date,
+      paymentMethod,
+      referenceNumber,
+      paidTo,
+      notes,
+      lorryId,
+      loadingId
+    } = req.body;
+
+    const data: any = {};
+    if (category !== undefined) data.category = category.trim().toUpperCase();
+    if (title !== undefined) data.title = title.trim();
+    if (amount !== undefined) {
+      const numAmount = parseFloat(amount);
+      if (isNaN(numAmount) || numAmount <= 0) {
+        return res.status(400).json({ error: 'Amount must be a positive number.' });
+      }
+      data.amount = numAmount;
+    }
+    if (date !== undefined) data.date = new Date(date);
+    if (paymentMethod !== undefined) data.paymentMethod = paymentMethod;
+    if (referenceNumber !== undefined) data.referenceNumber = referenceNumber?.trim() || null;
+    if (paidTo !== undefined) data.paidTo = paidTo?.trim() || null;
+    if (notes !== undefined) data.notes = notes?.trim() || null;
+    if (lorryId !== undefined) data.lorryId = lorryId || null;
+    if (loadingId !== undefined) data.loadingId = loadingId || null;
+
+    const updated = await prisma.expense.update({
+      where: { id },
+      data,
+      include: {
+        lorry: { include: { route: true } },
+        loading: true
+      }
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Delete an Expense
+app.delete('/api/expenses/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await prisma.expense.delete({
+      where: { id }
+    });
+    res.json({ success: true, message: 'Expense record deleted.' });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
   }
 });
 
@@ -2369,6 +2740,68 @@ async function seedIfEmpty() {
           await prisma.product.update({ where: { id: prod.id }, data: { supplierId: sup3.id } });
         }
       }
+    }
+
+    // 6. Ensure Sample Operating Expenses exist for realistic demo
+    const expenseCount = await prisma.expense.count();
+    if (expenseCount === 0) {
+      console.log('[Auto-Seed] Seeding initial operating and fleet expenses...');
+      const lorriesList = await prisma.lorry.findMany();
+      const l1 = lorriesList[0];
+      const l2 = lorriesList[1];
+
+      await prisma.expense.createMany({
+        data: [
+          {
+            expenseNumber: 'EXP-20261031-0001',
+            category: 'FUEL',
+            title: 'Diesel Fuel - Full Tank Refuel',
+            amount: 14500.0,
+            date: new Date(),
+            paymentMethod: 'CASH',
+            referenceNumber: 'PETRO-4921',
+            paidTo: 'Ceypetco Filling Station',
+            notes: 'Morning fuel refill before dispatch',
+            lorryId: l1?.id || null
+          },
+          {
+            expenseNumber: 'EXP-20261031-0002',
+            category: 'DRIVER_ALLOWANCE',
+            title: 'Driver & Helper Route Meal Allowance',
+            amount: 2200.0,
+            date: new Date(),
+            paymentMethod: 'CASH',
+            referenceNumber: 'ALW-1031-01',
+            paidTo: l1?.driverName || 'Sunil Perera',
+            notes: 'Daily field route allowance',
+            lorryId: l1?.id || null
+          },
+          {
+            expenseNumber: 'EXP-20261031-0003',
+            category: 'FUEL',
+            title: 'Diesel Fuel - Route Refill',
+            amount: 12800.0,
+            date: new Date(),
+            paymentMethod: 'CASH',
+            referenceNumber: 'PETRO-4938',
+            paidTo: 'IOC Service Station',
+            notes: 'Route delivery diesel',
+            lorryId: l2?.id || null
+          },
+          {
+            expenseNumber: 'EXP-20261031-0004',
+            category: 'UTILITIES',
+            title: 'Warehouse Electricity & Cold Storage',
+            amount: 18500.0,
+            date: new Date(),
+            paymentMethod: 'BANK_TRANSFER',
+            referenceNumber: 'CEB-948201',
+            paidTo: 'Ceylon Electricity Board',
+            notes: 'Monthly distribution depot power',
+            lorryId: null
+          }
+        ]
+      });
     }
 
     console.log('[Auto-Seed] System initial data ready.');

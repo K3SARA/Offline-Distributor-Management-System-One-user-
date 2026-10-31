@@ -19,6 +19,7 @@ import { Customers } from './pages/Customers';
 import { Reports } from './pages/Reports';
 import { ProfitAndLoss } from './pages/ProfitAndLoss';
 import { Suppliers } from './pages/Suppliers';
+import { Expenses } from './pages/Expenses';
 import { Settings } from './pages/Settings';
 import { InvoiceModal } from './components/InvoiceModal';
 import { CurrencyProvider, useCurrency, CURRENCIES } from './context/CurrencyContext';
@@ -94,6 +95,7 @@ export const AppContent: React.FC = () => {
               onNavigateToBillEntry={() => setCurrentTab('bill-entry')}
               onNavigateToSettlement={() => setCurrentTab('lorry-settlement')}
               onNavigateToInventory={() => setCurrentTab('inventory')}
+              onNavigateToExpenses={() => setCurrentTab('expenses')}
               onViewInvoice={(order) => setActiveInvoiceOrder(order)}
             />
           )}
@@ -117,6 +119,8 @@ export const AppContent: React.FC = () => {
           )}
 
           {currentTab === 'reports' && <Reports />}
+
+          {currentTab === 'expenses' && <Expenses />}
 
           {currentTab === 'pnl' && <ProfitAndLoss />}
 
