@@ -240,7 +240,18 @@ export const Inventory: React.FC<InventoryProps> = ({ onNavigateToSuppliers }) =
                         </span>
                       </td>
                       <td className="px-6 py-4 font-bold text-slate-900 font-mono">
-                        {formatMoney(p.unitPrice)}
+                        {p.isRawMaterial ? (
+                          <div className="flex flex-col">
+                            <span className="text-[11px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md w-fit">
+                              Cost: {formatMoney(p.costPrice)}
+                            </span>
+                            <span className="text-[10px] text-slate-400 mt-0.5 font-sans font-normal">
+                              No selling price
+                            </span>
+                          </div>
+                        ) : (
+                          formatMoney(p.unitPrice)
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
@@ -303,6 +314,7 @@ export const Inventory: React.FC<InventoryProps> = ({ onNavigateToSuppliers }) =
       <ProductModal
         isOpen={isProductModalOpen}
         product={editingProduct}
+        defaultIsRawMaterial={materialFilter === 'RAW'}
         onClose={() => setIsProductModalOpen(false)}
         onSaved={loadProducts}
       />

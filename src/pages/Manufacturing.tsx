@@ -20,11 +20,13 @@ import {
   Calendar,
   Trash2,
   Check,
-  Filter
+  Filter,
+  Edit2
 } from 'lucide-react';
 import { Recipe, ProductionRun, Product, ManufacturingSummary } from '../types';
 import { ManufacturingService, ProductService } from '../services/api';
 import { useCurrency } from '../context/CurrencyContext';
+import { ProductModal } from '../components/ProductModal';
 
 export const Manufacturing: React.FC = () => {
   const { formatMoney } = useCurrency();
@@ -44,6 +46,8 @@ export const Manufacturing: React.FC = () => {
   const [isRunModalOpen, setIsRunModalOpen] = useState<boolean>(false);
   const [isRecipeModalOpen, setIsRecipeModalOpen] = useState<boolean>(false);
   const [selectedRunDetail, setSelectedRunDetail] = useState<ProductionRun | null>(null);
+  const [isRawMaterialModalOpen, setIsRawMaterialModalOpen] = useState<boolean>(false);
+  const [editingRawMaterial, setEditingRawMaterial] = useState<Product | null>(null);
 
   // Notifications
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -583,18 +587,31 @@ export const Manufacturing: React.FC = () => {
       {/* Tab 3: Raw Materials Inventory */}
       {activeTab === 'MATERIALS' && (
         <div className="bg-white border border-slate-200/80 rounded-3xl shadow-2xs overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-bold text-slate-900">
                 Raw Materials & Ingredients Stock
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Central warehouse stock of components consumed in manufacturing.
+                Central warehouse stock of components consumed in manufacturing recipes (no selling price required).
               </p>
             </div>
-            <span className="text-xs font-mono font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-xl">
-              {rawMaterials.length} Items
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono font-bold text-slate-500 bg-slate-100 px-2.5 py-1.5 rounded-xl">
+                {rawMaterials.length} Items
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingRawMaterial(null);
+                  setIsRawMaterialModalOpen(true);
+                }}
+                className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Raw Material</span>
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -607,7 +624,8 @@ export const Manufacturing: React.FC = () => {
                   <th className="py-3 px-4">Unit Cost Price</th>
                   <th className="py-3 px-4">Stock on Hand</th>
                   <th className="py-3 px-4">Inventory Value</th>
-                  <th className="py-3 px-5 text-right">Status</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-5 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
@@ -622,17 +640,20 @@ export const Manufacturing: React.FC = () => {
                           {prod.category}
                         </span>
                       </td>
-                      <td className="py-3 px-4 font-mono">{formatMoney(prod.costPrice)}</td>
+                      <td className="py-3 px-4 font-mono font-semibold text-purple-700">
+                        {formatMoney(prod.costPrice)}
+                        <span className="text-[10px] text-slate-400 block font-normal font-sans">per {prod.unit}</span>
+                      </td>
                       <td className="py-3 px-4 font-mono font-bold text-slate-900">
                         {prod.currentStock} {prod.unit}
                       </td>
                       <td className="py-3 px-4 font-mono font-bold text-emerald-600">
                         {formatMoney(prod.currentStock * prod.costPrice)}
                       </td>
-                      <td className="py-3 px-5 text-right">
+                      <td className="py-3 px-4">
                         {isLow ? (
                           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200/60">
-                            Low Stock (Min {prod.minStockAlert})
+                            Low (Min {prod.minStockAlert})
                           </span>
                         ) : (
                           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700">
@@ -640,14 +661,46 @@ export const Manufacturing: React.FC = () => {
                           </span>
                         )}
                       </td>
+                      <td className="py-3 px-5 text-right">
+                        <button
+                          onClick={() => {
+                            setEditingRawMaterial(prod);
+                            setIsRawMaterialModalOpen(true);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-slate-100 transition inline-flex items-center gap-1 text-[11px] font-semibold"
+                          title="Edit Raw Material"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
 
                 {rawMaterials.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-xs text-slate-400">
-                      No products tagged as raw materials. You can mark any component as raw material in Warehouse Stock or create new ones.
+                    <td colSpan={8} className="py-14 text-center text-xs text-slate-400 space-y-3">
+                      <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 mx-auto flex items-center justify-center">
+                        <Layers className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-700">No Raw Materials Recorded Yet</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Add ingredients or packaging materials without needing a selling price.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingRawMaterial(null);
+                          setIsRawMaterialModalOpen(true);
+                        }}
+                        className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs transition"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add First Raw Material</span>
+                      </button>
                     </td>
                   </tr>
                 )}
@@ -1133,6 +1186,18 @@ export const Manufacturing: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Raw Material Add/Edit Modal */}
+      <ProductModal
+        isOpen={isRawMaterialModalOpen}
+        product={editingRawMaterial}
+        defaultIsRawMaterial={true}
+        onClose={() => {
+          setIsRawMaterialModalOpen(false);
+          setEditingRawMaterial(null);
+        }}
+        onSaved={loadAllData}
+      />
     </div>
   );
 };

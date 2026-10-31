@@ -170,7 +170,7 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
       setLorries(lorryList);
       setCustomers(custList);
       setTodayOrders(orderList);
-      setWarehouseProducts(prodList);
+      setWarehouseProducts(prodList.filter(p => !p.isRawMaterial));
 
       if (lorryList.length > 0 && !selectedLorryId) {
         setSelectedLorryId(lorryList[0].id);

@@ -45,7 +45,7 @@ export const OrderEntry: React.FC<OrderEntryProps> = ({ onBack, onOrderCompleted
           ProductService.getAll()
         ]);
         setCustomers(custRes);
-        setProducts(prodRes);
+        setProducts(prodRes.filter(p => !p.isRawMaterial));
         if (custRes.length > 0) {
           setSelectedCustomerId(custRes[0].id);
         }

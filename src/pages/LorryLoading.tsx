@@ -105,7 +105,7 @@ export const LorryLoading: React.FC = () => {
         ProductService.getAll()
       ]);
       setLorries(lorryList);
-      setWarehouseProducts(productList);
+      setWarehouseProducts(productList.filter(p => !p.isRawMaterial));
 
       if (lorryList.length > 0 && !selectedLorryId) {
         setSelectedLorryId(lorryList[0].id);

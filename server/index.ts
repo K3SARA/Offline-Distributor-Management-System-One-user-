@@ -70,27 +70,31 @@ app.get('/api/products', async (req: Request, res: Response) => {
 // Create product
 app.post('/api/products', async (req: Request, res: Response) => {
   try {
-    const { sku, name, category, unit, unitPrice, costPrice, currentStock, minStockAlert } = req.body;
+    const { sku, name, category, unit, unitPrice, costPrice, currentStock, minStockAlert, freeRatioBuy, freeRatioGet, isRawMaterial } = req.body;
 
-    if (!sku || !name || unitPrice === undefined) {
-      return res.status(400).json({ error: 'SKU, Name, and Unit Price are required.' });
+    if (!sku || !name) {
+      return res.status(400).json({ error: 'SKU and Name are required.' });
     }
 
-    const { freeRatioBuy, freeRatioGet, isRawMaterial } = req.body;
+    const isRaw = Boolean(isRawMaterial);
+
+    if (!isRaw && (unitPrice === undefined || unitPrice === null || unitPrice === '')) {
+      return res.status(400).json({ error: 'Selling Unit Price is required for finished goods.' });
+    }
 
     const product = await prisma.product.create({
       data: {
         sku: sku.trim().toUpperCase(),
         name: name.trim(),
-        category: category?.trim() || 'General',
-        unit: unit?.trim() || 'Unit',
-        unitPrice: parseFloat(unitPrice),
+        category: category?.trim() || (isRaw ? 'Raw Materials' : 'General'),
+        unit: unit?.trim() || (isRaw ? 'Kg' : 'Unit'),
+        unitPrice: isRaw ? (unitPrice ? parseFloat(unitPrice) : 0) : parseFloat(unitPrice),
         costPrice: parseFloat(costPrice || 0),
         currentStock: parseInt(currentStock || 0, 10),
         minStockAlert: parseInt(minStockAlert || 10, 10),
-        freeRatioBuy: freeRatioBuy ? parseInt(freeRatioBuy, 10) : 0,
-        freeRatioGet: freeRatioGet ? parseInt(freeRatioGet, 10) : 0,
-        isRawMaterial: isRawMaterial ? Boolean(isRawMaterial) : false
+        freeRatioBuy: isRaw ? 0 : (freeRatioBuy ? parseInt(freeRatioBuy, 10) : 0),
+        freeRatioGet: isRaw ? 0 : (freeRatioGet ? parseInt(freeRatioGet, 10) : 0),
+        isRawMaterial: isRaw
       }
     });
 
@@ -100,7 +104,7 @@ app.post('/api/products', async (req: Request, res: Response) => {
           productId: product.id,
           type: 'INBOUND',
           quantity: product.currentStock,
-          notes: 'Initial warehouse intake stock'
+          notes: isRaw ? 'Initial raw material intake stock' : 'Initial warehouse intake stock'
         }
       });
     }
@@ -116,6 +120,7 @@ app.put('/api/products/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { sku, name, category, unit, unitPrice, costPrice, minStockAlert, freeRatioBuy, freeRatioGet, isRawMaterial } = req.body;
+    const isRaw = isRawMaterial !== undefined ? Boolean(isRawMaterial) : undefined;
 
     const updated = await prisma.product.update({
       where: { id },
@@ -124,12 +129,12 @@ app.put('/api/products/:id', async (req: Request, res: Response) => {
         name: name?.trim(),
         category: category?.trim(),
         unit: unit?.trim(),
-        unitPrice: unitPrice !== undefined ? parseFloat(unitPrice) : undefined,
+        unitPrice: isRaw ? 0 : (unitPrice !== undefined ? parseFloat(unitPrice) : undefined),
         costPrice: costPrice !== undefined ? parseFloat(costPrice) : undefined,
         minStockAlert: minStockAlert !== undefined ? parseInt(minStockAlert, 10) : undefined,
-        freeRatioBuy: freeRatioBuy !== undefined ? parseInt(freeRatioBuy, 10) : undefined,
-        freeRatioGet: freeRatioGet !== undefined ? parseInt(freeRatioGet, 10) : undefined,
-        isRawMaterial: isRawMaterial !== undefined ? Boolean(isRawMaterial) : undefined
+        freeRatioBuy: isRaw ? 0 : (freeRatioBuy !== undefined ? parseInt(freeRatioBuy, 10) : undefined),
+        freeRatioGet: isRaw ? 0 : (freeRatioGet !== undefined ? parseInt(freeRatioGet, 10) : undefined),
+        isRawMaterial: isRaw
       }
     });
 
