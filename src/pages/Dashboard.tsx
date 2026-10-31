@@ -12,7 +12,6 @@ import {
   ArrowRight,
   RefreshCw,
   Clock,
-  Compass,
   Wallet,
   Calendar
 } from 'lucide-react';
@@ -205,11 +204,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   >
                     {lorry.status.replace(/_/g, ' ')}
                   </span>
-                </div>
-
-                <div className="text-xs sm:text-sm text-slate-500 flex items-center gap-1.5 pt-1">
-                  <Compass className="w-4 h-4 text-slate-400 shrink-0" />
-                  <span className="font-semibold text-slate-700">{lorry.routeName}</span>
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-2xl grid grid-cols-2 gap-2 text-xs">
