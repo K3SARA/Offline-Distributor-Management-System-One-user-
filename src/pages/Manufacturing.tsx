@@ -223,8 +223,10 @@ export const Manufacturing: React.FC = () => {
     ? targetOutput / activeRunRecipe.outputYield
     : 1;
 
-  // Raw materials list
-  const rawMaterials = products.filter(p => p.isRawMaterial || p.category.toLowerCase().includes('raw') || p.category.toLowerCase().includes('pack'));
+  // Raw materials list (ingredients & packaging)
+  const rawMaterials = products.filter(p => Boolean(p.isRawMaterial) || p.category.toLowerCase().includes('raw') || p.category.toLowerCase().includes('pack'));
+  // Finished goods list (sellable products produced by manufacturing)
+  const finishedGoods = products.filter(p => !p.isRawMaterial && !p.category.toLowerCase().includes('raw') && !p.category.toLowerCase().includes('pack'));
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6 overflow-y-auto h-full pb-24 md:pb-8">
@@ -938,8 +940,8 @@ export const Manufacturing: React.FC = () => {
                     onChange={(e) => setRecipeProductId(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                   >
-                    <option value="">Select Finished Good...</option>
-                    {products.map((p) => (
+                    <option value="">Select Finished Good to Produce...</option>
+                    {finishedGoods.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name} ({p.sku})
                       </option>
@@ -965,17 +967,35 @@ export const Manufacturing: React.FC = () => {
               {/* Recipe Items Table */}
               <div className="space-y-2 pt-2 border-t border-slate-100">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-                    Components & Raw Materials *
-                  </label>
-                  <button
-                    type="button"
-                    onClick={addRecipeRow}
-                    className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Component</span>
-                  </button>
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                      Components & Raw Materials *
+                    </label>
+                    <span className="text-[10px] text-slate-400">
+                      Raw ingredients consumed per batch
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingRawMaterial(null);
+                        setIsRawMaterialModalOpen(true);
+                      }}
+                      className="text-xs font-semibold text-purple-600 hover:text-purple-700 flex items-center gap-1 bg-purple-50 px-2.5 py-1 rounded-xl border border-purple-100 transition"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>New Raw Material</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={addRecipeRow}
+                      className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 bg-blue-50 px-2.5 py-1 rounded-xl border border-blue-100 transition"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Row</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -987,11 +1007,15 @@ export const Manufacturing: React.FC = () => {
                         className="flex-1 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                       >
                         <option value="">Select Raw Material / Ingredient...</option>
-                        {products.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} ({p.unit}) • Stock: {p.currentStock}
-                          </option>
-                        ))}
+                        {rawMaterials.length === 0 ? (
+                          <option value="" disabled>No raw materials registered — click "+ New Raw Material" above</option>
+                        ) : (
+                          rawMaterials.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} ({p.unit}) • Stock: {p.currentStock}
+                            </option>
+                          ))
+                        )}
                       </select>
 
                       <div className="w-24">
