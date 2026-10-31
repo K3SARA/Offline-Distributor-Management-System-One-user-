@@ -1718,6 +1718,7 @@ async function seedIfEmpty() {
             outstandingBalance: 0.0
           }
         ]
+      });
     }
 
     // Ensure default Walk-in Customer exists
