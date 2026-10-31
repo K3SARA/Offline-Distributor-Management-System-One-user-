@@ -27,7 +27,8 @@ import {
   ChevronRight,
   BadgeCheck,
   RefreshCw,
-  Wallet
+  Wallet,
+  MoreHorizontal
 } from 'lucide-react';
 import { SupplierService, PurchaseOrderService, ProductService } from '../services/api';
 import { Supplier, PurchaseOrder, Product } from '../types';
@@ -50,6 +51,19 @@ export const Suppliers: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>('');
+  const [expandedSupplierIds, setExpandedSupplierIds] = useState<Set<string>>(new Set());
+
+  const toggleExpandSupplier = (id: string) => {
+    setExpandedSupplierIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   // Modals state
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState<boolean>(false);
@@ -548,57 +562,75 @@ export const Suppliers: React.FC = () => {
           ) : (
             suppliers.map((supplier) => {
               const hasBalance = supplier.outstandingBalance > 0;
+              const isExpanded = expandedSupplierIds.has(supplier.id);
               return (
                 <div
                   key={supplier.id}
                   className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs hover:shadow-sm transition-all p-5 flex flex-col justify-between space-y-4"
                 >
                   <div className="space-y-3">
-                    {/* Header: Code & Action menu */}
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2.5">
+                    {/* Header: Code, Name, Terms & Three-Dots Toggle Button */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
                         <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm shrink-0">
                           <Building2 className="w-5 h-5" />
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <span className="font-mono text-xs font-extrabold text-blue-600 block">
                             {supplier.code}
                           </span>
-                          <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-snug">
+                          <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-snug truncate" title={supplier.name}>
                             {supplier.name}
                           </h3>
                         </div>
                       </div>
 
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 uppercase">
-                        {supplier.paymentTerms || 'NET 30'}
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 uppercase">
+                          {supplier.paymentTerms || 'NET 30'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => toggleExpandSupplier(supplier.id)}
+                          className={`p-1.5 rounded-xl border transition-all duration-150 flex items-center justify-center ${
+                            isExpanded
+                              ? 'bg-blue-50 text-blue-600 border-blue-200/80 shadow-2xs'
+                              : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100 border-transparent'
+                          }`}
+                          title={isExpanded ? 'Hide contact details' : 'Show contact details'}
+                          aria-label="Toggle contact details"
+                        >
+                          <MoreHorizontal className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Contact & Location */}
-                    <div className="space-y-1 text-xs text-slate-600 pt-1">
-                      {supplier.contactPerson && (
-                        <div className="font-medium text-slate-700">
-                          Rep: {supplier.contactPerson}
+                    {/* Expandable Contact & Location Details */}
+                    {isExpanded && (
+                      <div className="p-3 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-1.5 text-xs text-slate-600 animate-fadeIn">
+                        {supplier.contactPerson && (
+                          <div className="font-semibold text-slate-800">
+                            Rep: {supplier.contactPerson}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5 font-mono text-[11px] text-slate-600">
+                          <Phone className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                          <span>{supplier.phone}</span>
                         </div>
-                      )}
-                      <div className="flex items-center gap-1.5 font-mono text-[11px] text-slate-500">
-                        <Phone className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{supplier.phone}</span>
+                        {supplier.email && (
+                          <div className="flex items-center gap-1.5 text-[11px] text-slate-600 truncate">
+                            <Mail className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                            <span className="truncate">{supplier.email}</span>
+                          </div>
+                        )}
+                        {supplier.address && (
+                          <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                            <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                            <span className="truncate">{supplier.address}, {supplier.city}</span>
+                          </div>
+                        )}
                       </div>
-                      {supplier.email && (
-                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 truncate">
-                          <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="truncate">{supplier.email}</span>
-                        </div>
-                      )}
-                      {supplier.address && (
-                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="truncate">{supplier.address}, {supplier.city}</span>
-                        </div>
-                      )}
-                    </div>
+                    )}
 
                     {/* Balance & Stats Box */}
                     <div className="p-3 bg-slate-50 rounded-2xl space-y-1.5 border border-slate-100">

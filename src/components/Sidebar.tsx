@@ -54,7 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'Operations Workflow',
       items: [
         { id: 'inventory', label: 'Warehouse Stock', icon: Boxes, badge: 'Step 1', badgeTone: 'step' },
-        { id: 'suppliers', label: 'Suppliers & Inward', icon: Building2, badge: 'Stock In', badgeTone: 'inward' },
+        { id: 'suppliers', label: 'Suppliers', icon: Building2, badge: 'Stock In', badgeTone: 'inward' },
         { id: 'lorry-loading', label: 'Morning Lorry Load', icon: Truck, badge: 'Step 2', badgeTone: 'step' },
         { id: 'bill-entry', label: 'Office Bill Entry', icon: Receipt, badge: 'Step 3', badgeTone: 'step' },
         { id: 'lorry-settlement', label: 'Day Settlement', icon: RotateCcw, badge: 'Step 4', badgeTone: 'step' }
@@ -153,17 +153,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <button
                       key={item.id}
                       onClick={() => handleItemClick(item.id)}
-                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-[13.5px] transition-all duration-150 text-left group ${
-                        isActive
+                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-[13.5px] transition-all duration-150 text-left group ${isActive
                           ? 'bg-[#0071E3] text-white shadow-sm shadow-blue-500/20 font-semibold'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 font-medium'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-3 min-w-0 pr-2">
                         <Icon
-                          className={`w-[18px] h-[18px] shrink-0 transition-colors ${
-                            isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-700'
-                          }`}
+                          className={`w-[18px] h-[18px] shrink-0 transition-colors ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-700'
+                            }`}
                         />
                         <span className="truncate">{item.label}</span>
                       </div>
