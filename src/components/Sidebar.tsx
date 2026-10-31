@@ -11,6 +11,7 @@ import {
   Database,
   Coins,
   Settings as SettingsIcon,
+  TrendingUp,
   X
 } from 'lucide-react';
 import { useCurrency, CURRENCIES, CurrencyCode } from '../context/CurrencyContext';
@@ -37,6 +38,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'bill-entry', label: 'Office Bill Entry', icon: Receipt, badge: 'Step 3' },
     { id: 'lorry-settlement', label: 'Day Settlement', icon: RotateCcw, badge: 'Step 4' },
     { id: 'customers', label: 'Clients & Accounts', icon: Users },
+    { id: 'pnl', label: 'Profit & Loss', icon: TrendingUp, badge: 'P&L' },
     { id: 'reports', label: 'Reports & Audit', icon: BarChart3 },
     { id: 'settings', label: 'Fleet & Settings', icon: SettingsIcon }
   ];

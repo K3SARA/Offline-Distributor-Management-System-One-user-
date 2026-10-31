@@ -11,16 +11,18 @@ import {
   Boxes,
   Truck,
   Compass,
-  RotateCcw
+  RotateCcw,
+  TrendingUp
 } from 'lucide-react';
 import { ReportService } from '../services/api';
 import { StockMovement, Customer, LorryLoading } from '../types';
 import { useCurrency } from '../context/CurrencyContext';
 import { DateRangeFilter, DatePreset } from '../components/DateRangeFilter';
+import { ProfitAndLoss } from './ProfitAndLoss';
 
 export const Reports: React.FC = () => {
   const { formatMoney } = useCurrency();
-  const [activeTab, setActiveTab] = useState<'LORRIES' | 'ROUTES' | 'SALES' | 'STOCK' | 'BALANCES'>('LORRIES');
+  const [activeTab, setActiveTab] = useState<'PNL' | 'LORRIES' | 'ROUTES' | 'SALES' | 'STOCK' | 'BALANCES'>('LORRIES');
   const [loading, setLoading] = useState(false);
 
   // Date filter state
@@ -163,6 +165,13 @@ export const Reports: React.FC = () => {
         {/* Report Tabs */}
         <div className="flex gap-1 sm:gap-1.5 bg-slate-200/60 p-1 sm:p-1.5 rounded-2xl w-full sm:w-fit overflow-x-auto pb-1 sm:pb-1.5">
           <button
+            onClick={() => setActiveTab('PNL')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'PNL' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-700 hover:text-slate-900'
+              }`}
+          >
+            <TrendingUp className="w-3.5 h-3.5 text-emerald-600" /> Profit & Loss (P&L)
+          </button>
+          <button
             onClick={() => setActiveTab('LORRIES')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap ${activeTab === 'LORRIES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
               }`}
@@ -209,7 +218,10 @@ export const Reports: React.FC = () => {
       </div>
 
       {/* REPORT CONTENT AREA */}
-      <div className="bg-white border border-slate-200/70 rounded-2xl sm:rounded-3xl shadow-2xs p-4 sm:p-8 space-y-4 sm:space-y-6">
+      {activeTab === 'PNL' ? (
+        <ProfitAndLoss />
+      ) : (
+        <div className="bg-white border border-slate-200/70 rounded-2xl sm:rounded-3xl shadow-2xs p-4 sm:p-8 space-y-4 sm:space-y-6">
         {/* Printable Report Header */}
         <div className="border-b border-slate-100 pb-3 sm:pb-4">
           <div className="flex justify-between items-start">
@@ -511,6 +523,7 @@ export const Reports: React.FC = () => {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };

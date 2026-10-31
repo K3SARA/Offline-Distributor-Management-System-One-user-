@@ -17,6 +17,7 @@ import { BillEntry } from './pages/BillEntry';
 import { LorrySettlement } from './pages/LorrySettlement';
 import { Customers } from './pages/Customers';
 import { Reports } from './pages/Reports';
+import { ProfitAndLoss } from './pages/ProfitAndLoss';
 import { Settings } from './pages/Settings';
 import { InvoiceModal } from './components/InvoiceModal';
 import { CurrencyProvider, useCurrency, CURRENCIES } from './context/CurrencyContext';
@@ -111,6 +112,8 @@ export const AppContent: React.FC = () => {
           )}
 
           {currentTab === 'reports' && <Reports />}
+
+          {currentTab === 'pnl' && <ProfitAndLoss />}
 
           {currentTab === 'settings' && <Settings />}
         </div>

@@ -8,7 +8,8 @@ import {
   Route,
   Lorry,
   LorryLoading,
-  SystemSettings
+  SystemSettings,
+  ProfitAndLossReport
 } from '../types';
 
 // Dynamic API URL: uses relative '/api' on Railway / production web,
@@ -116,7 +117,9 @@ export const ReportService = {
   getStockMovements: (type?: string, limit?: number, from?: string, to?: string) =>
     api.get<StockMovement[]>('/reports/stock-movements', { params: { type, limit, from, to } }).then(r => r.data),
   getCustomerBalances: () =>
-    api.get<any>('/reports/customer-balances').then(r => r.data)
+    api.get<any>('/reports/customer-balances').then(r => r.data),
+  getProfitAndLoss: (from?: string, to?: string) =>
+    api.get<ProfitAndLossReport>('/reports/profit-and-loss', { params: { from, to } }).then(r => r.data)
 };
 
 export const SettingsService = {

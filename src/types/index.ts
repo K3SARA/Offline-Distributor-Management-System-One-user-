@@ -188,3 +188,63 @@ export interface SystemSettings {
   defaultCreditLimit: number;
   lowStockThreshold: number;
 }
+
+export interface ProfitAndLossReport {
+  period: {
+    from: string;
+    to: string;
+  };
+  summary: {
+    grossRevenue: number;
+    discounts: number;
+    netRevenue: number;
+    cogs: number;
+    freeIssueCost: number;
+    totalCostOfSales: number;
+    grossProfit: number;
+    grossProfitMargin: number;
+    markupPercentage: number;
+    totalUnitsSold: number;
+    totalFreeUnits: number;
+    totalOrdersCount: number;
+    cashCollected: number;
+    creditReceivables: number;
+  };
+  channelBreakdown: Array<{
+    id: string;
+    channelName: string;
+    subtext: string;
+    billsCount: number;
+    netRevenue: number;
+    cogs: number;
+    freeIssueCost: number;
+    totalCost: number;
+    grossProfit: number;
+    margin: number;
+  }>;
+  productBreakdown: Array<{
+    productId: string;
+    name: string;
+    sku: string;
+    category: string;
+    unit: string;
+    unitPrice: number;
+    costPrice: number;
+    unitsSold: number;
+    unitsFree: number;
+    revenue: number;
+    cogs: number;
+    freeCost: number;
+    totalCost: number;
+    grossProfit: number;
+    margin: number;
+  }>;
+  dailyBreakdown: Array<{
+    date: string;
+    revenue: number;
+    cost: number;
+    profit: number;
+    margin: number;
+  }>;
+}
+

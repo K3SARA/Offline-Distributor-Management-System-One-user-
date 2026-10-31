@@ -1468,6 +1468,252 @@ app.get('/api/reports/customer-balances', async (_req: Request, res: Response) =
   }
 });
 
+// Profit and Loss Statement with full financial breakdown & date filtering
+app.get('/api/reports/profit-and-loss', async (req: Request, res: Response) => {
+  try {
+    const { from, to } = req.query;
+    const startDate = from ? new Date(from as string) : new Date(new Date().setHours(0, 0, 0, 0));
+    const endDate = to ? new Date(to as string) : new Date(new Date().setHours(23, 59, 59, 999));
+
+    const [orders, lorries] = await Promise.all([
+      prisma.order.findMany({
+        where: {
+          status: { not: 'CANCELLED' },
+          createdAt: {
+            gte: startDate,
+            lte: endDate
+          }
+        },
+        include: {
+          items: {
+            include: { product: true }
+          },
+          customer: true,
+          lorry: {
+            include: { route: true }
+          },
+          route: true
+        },
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.lorry.findMany({
+        include: { route: true }
+      })
+    ]);
+
+    let grossRevenue = 0;
+    let discounts = 0;
+    let netRevenue = 0;
+    let cogs = 0;
+    let freeIssueCost = 0;
+    let totalUnitsSold = 0;
+    let totalFreeUnits = 0;
+    let cashCollected = 0;
+
+    // Track product-level breakdown
+    const productStatsMap = new Map<string, {
+      productId: string;
+      name: string;
+      sku: string;
+      category: string;
+      unit: string;
+      unitPrice: number;
+      costPrice: number;
+      unitsSold: number;
+      unitsFree: number;
+      revenue: number;
+      cogs: number;
+      freeCost: number;
+      totalCost: number;
+      grossProfit: number;
+      margin: number;
+    }>();
+
+    // Track channel breakdown
+    const channelMap = new Map<string, {
+      id: string;
+      channelName: string;
+      subtext: string;
+      billsCount: number;
+      netRevenue: number;
+      cogs: number;
+      freeIssueCost: number;
+      totalCost: number;
+      grossProfit: number;
+      margin: number;
+    }>();
+
+    // Initialize lorries in channel map
+    for (const lorry of lorries) {
+      channelMap.set(lorry.id, {
+        id: lorry.id,
+        channelName: lorry.vehicleNumber,
+        subtext: `${lorry.driverName} • ${lorry.route?.name || 'Assigned Route'}`,
+        billsCount: 0,
+        netRevenue: 0,
+        cogs: 0,
+        freeIssueCost: 0,
+        totalCost: 0,
+        grossProfit: 0,
+        margin: 0
+      });
+    }
+
+    // Warehouse direct counter channel
+    const COUNTER_CHANNEL_ID = 'warehouse-counter';
+    channelMap.set(COUNTER_CHANNEL_ID, {
+      id: COUNTER_CHANNEL_ID,
+      channelName: 'Warehouse Sales Counter',
+      subtext: 'Direct Counter & Walk-in Cash Sales',
+      billsCount: 0,
+      netRevenue: 0,
+      cogs: 0,
+      freeIssueCost: 0,
+      totalCost: 0,
+      grossProfit: 0,
+      margin: 0
+    });
+
+    // Daily breakdown map
+    const dailyMap = new Map<string, {
+      date: string;
+      revenue: number;
+      cost: number;
+      profit: number;
+      margin: number;
+    }>();
+
+    for (const order of orders) {
+      grossRevenue += order.subtotal;
+      discounts += order.discountAmount;
+      netRevenue += order.netTotal;
+      cashCollected += order.cashReceived;
+
+      const channelKey = order.lorryId || COUNTER_CHANNEL_ID;
+      const channel = channelMap.get(channelKey);
+      if (channel) {
+        channel.billsCount += 1;
+        channel.netRevenue += order.netTotal;
+      }
+
+      const dateKey = order.createdAt.toISOString().slice(0, 10);
+      let dayStat = dailyMap.get(dateKey);
+      if (!dayStat) {
+        dayStat = { date: dateKey, revenue: 0, cost: 0, profit: 0, margin: 0 };
+        dailyMap.set(dateKey, dayStat);
+      }
+      dayStat.revenue += order.netTotal;
+
+      for (const item of order.items) {
+        const prod = item.product;
+        const soldQty = item.quantity;
+        const freeQty = item.freeQuantity || 0;
+        const itemCogs = soldQty * prod.costPrice;
+        const itemFreeCost = freeQty * prod.costPrice;
+        const itemLineTotal = item.lineTotal;
+
+        cogs += itemCogs;
+        freeIssueCost += itemFreeCost;
+        totalUnitsSold += soldQty;
+        totalFreeUnits += freeQty;
+
+        if (channel) {
+          channel.cogs += itemCogs;
+          channel.freeIssueCost += itemFreeCost;
+          channel.totalCost += (itemCogs + itemFreeCost);
+        }
+
+        dayStat.cost += (itemCogs + itemFreeCost);
+
+        // Product map
+        let prodStat = productStatsMap.get(prod.id);
+        if (!prodStat) {
+          prodStat = {
+            productId: prod.id,
+            name: prod.name,
+            sku: prod.sku,
+            category: prod.category,
+            unit: prod.unit,
+            unitPrice: prod.unitPrice,
+            costPrice: prod.costPrice,
+            unitsSold: 0,
+            unitsFree: 0,
+            revenue: 0,
+            cogs: 0,
+            freeCost: 0,
+            totalCost: 0,
+            grossProfit: 0,
+            margin: 0
+          };
+          productStatsMap.set(prod.id, prodStat);
+        }
+
+        prodStat.unitsSold += soldQty;
+        prodStat.unitsFree += freeQty;
+        prodStat.revenue += itemLineTotal;
+        prodStat.cogs += itemCogs;
+        prodStat.freeCost += itemFreeCost;
+        prodStat.totalCost += (itemCogs + itemFreeCost);
+      }
+    }
+
+    const totalCostOfSales = cogs + freeIssueCost;
+    const grossProfit = netRevenue - totalCostOfSales;
+    const grossProfitMargin = netRevenue > 0 ? (grossProfit / netRevenue) * 100 : 0;
+    const markupPercentage = totalCostOfSales > 0 ? (grossProfit / totalCostOfSales) * 100 : 0;
+    const creditReceivables = Math.max(0, netRevenue - cashCollected);
+
+    // Compute margins for channels
+    const channelBreakdown = Array.from(channelMap.values()).map(c => {
+      c.grossProfit = c.netRevenue - c.totalCost;
+      c.margin = c.netRevenue > 0 ? (c.grossProfit / c.netRevenue) * 100 : 0;
+      return c;
+    });
+
+    // Compute margins for products & sort by profit descending
+    const productBreakdown = Array.from(productStatsMap.values()).map(p => {
+      p.grossProfit = p.revenue - p.totalCost;
+      p.margin = p.revenue > 0 ? (p.grossProfit / p.revenue) * 100 : 0;
+      return p;
+    }).sort((a, b) => b.grossProfit - a.grossProfit);
+
+    // Daily breakdown sorted by date
+    const dailyBreakdown = Array.from(dailyMap.values()).map(d => {
+      d.profit = d.revenue - d.cost;
+      d.margin = d.revenue > 0 ? (d.profit / d.revenue) * 100 : 0;
+      return d;
+    }).sort((a, b) => a.date.localeCompare(b.date));
+
+    res.json({
+      period: {
+        from: startDate.toISOString(),
+        to: endDate.toISOString()
+      },
+      summary: {
+        grossRevenue,
+        discounts,
+        netRevenue,
+        cogs,
+        freeIssueCost,
+        totalCostOfSales,
+        grossProfit,
+        grossProfitMargin,
+        markupPercentage,
+        totalUnitsSold,
+        totalFreeUnits,
+        totalOrdersCount: orders.length,
+        cashCollected,
+        creditReceivables
+      },
+      channelBreakdown,
+      productBreakdown,
+      dailyBreakdown
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ========================================================
 // 8. GENERAL & BUSINESS SETTINGS
 // ========================================================
