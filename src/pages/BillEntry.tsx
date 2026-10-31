@@ -56,6 +56,12 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
   const [cashReceived, setCashReceived] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
 
+  // Customer Unpaid Bills (for Bill-to-Bill clearance / knock-off)
+  const [customerUnpaidBills, setCustomerUnpaidBills] = useState<Order[]>([]);
+  const [loadingUnpaidBills, setLoadingUnpaidBills] = useState<boolean>(false);
+  const [settlePreviousBill, setSettlePreviousBill] = useState<boolean>(false);
+  const [settleAmount, setSettleAmount] = useState<string>('');
+
   const [loading, setLoading] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -200,6 +206,39 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
   const availableLorryProducts = selectedLorry?.lorryStocks?.filter(s => s.quantity > 0) || [];
   const selectedCustomer = selectedCustomerId !== 'walk-in' ? customers.find(c => c.id === selectedCustomerId) : null;
 
+  // Load unpaid bills when selected customer changes
+  useEffect(() => {
+    if (selectedCustomerId && selectedCustomerId !== 'walk-in') {
+      setLoadingUnpaidBills(true);
+      CustomerService.getUnpaidBills(selectedCustomerId)
+        .then((bills) => {
+          setCustomerUnpaidBills(bills);
+          const firstBill = bills[0];
+          if (firstBill) {
+            // Default to settling the oldest unpaid bill
+            const oldestDue = (firstBill.balanceAmount !== undefined && firstBill.balanceAmount > 0)
+              ? firstBill.balanceAmount
+              : Math.max(0, firstBill.netTotal - (firstBill.paidAmount || 0));
+            setSettlePreviousBill(true);
+            setSettleAmount(oldestDue.toString());
+          } else {
+            setSettlePreviousBill(false);
+            setSettleAmount('');
+          }
+        })
+        .catch(() => {
+          setCustomerUnpaidBills([]);
+          setSettlePreviousBill(false);
+          setSettleAmount('');
+        })
+        .finally(() => setLoadingUnpaidBills(false));
+    } else {
+      setCustomerUnpaidBills([]);
+      setSettlePreviousBill(false);
+      setSettleAmount('');
+    }
+  }, [selectedCustomerId]);
+
   // Auto-filter customers belonging to this lorry's route first, then rest
   const routeCustomers = customers.filter(c => selectedLorry?.routeId && c.routeId === selectedLorry.routeId);
   const otherCustomers = customers.filter(c => !selectedLorry?.routeId || c.routeId !== selectedLorry.routeId);
@@ -335,6 +374,18 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
       setSubmitting(true);
       const parsedCash = parseFloat(cashReceived) || 0;
 
+      // Prepare previous bill clearance payload if toggled
+      const previousBillsPayload =
+        settlePreviousBill && customerUnpaidBills.length > 0 && parseFloat(settleAmount) > 0
+          ? [
+              {
+                orderId: customerUnpaidBills[0].id,
+                amount: parseFloat(settleAmount),
+                paymentMethod: 'CASH'
+              }
+            ]
+          : undefined;
+
       if (billMode === 'LORRY') {
         const createdOrder = await LorryService.enterDriverBill(selectedLorryId, {
           paperBillNumber: paperBillNumber.trim() || undefined,
@@ -346,11 +397,13 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
           })),
           paymentMethod,
           cashReceived: parsedCash,
-          notes: notes.trim() || undefined
+          notes: notes.trim() || undefined,
+          settlePreviousBills: previousBillsPayload
         });
 
+        const settleNote = previousBillsPayload ? ` + Cleared Prev Bill (${formatMoney(previousBillsPayload[0].amount)})` : '';
         setSuccessMessage(
-          `Lorry Bill #${paperBillNumber || createdOrder.orderNumber} successfully entered for ${createdOrder.customer.name}! (${totalBilledUnits} paid + ${totalFreeUnits} free units deducted from lorry)`
+          `Lorry Bill #${paperBillNumber || createdOrder.orderNumber} successfully entered for ${createdOrder.customer.name}! (${totalBilledUnits} paid + ${totalFreeUnits} free units deducted from lorry)${settleNote}`
         );
       } else {
         // WALK_IN mode: deducts directly from warehouse stock
@@ -366,12 +419,14 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
           })),
           paymentMethod,
           cashReceived: parsedCash,
-          notes: notes.trim() || undefined
+          notes: notes.trim() || undefined,
+          settlePreviousBills: previousBillsPayload
         });
 
         const customerDisplayName = walkInName.trim() || (createdOrder.customer ? createdOrder.customer.name : 'Walk-in Customer');
+        const settleNote = previousBillsPayload ? ` + Cleared Prev Bill (${formatMoney(previousBillsPayload[0].amount)})` : '';
         setSuccessMessage(
-          `Counter Bill #${paperBillNumber || createdOrder.orderNumber} successfully saved for ${customerDisplayName}! (${totalBilledUnits} paid + ${totalFreeUnits} free units deducted directly from Central Warehouse)`
+          `Counter Bill #${paperBillNumber || createdOrder.orderNumber} successfully saved for ${customerDisplayName}! (${totalBilledUnits} paid + ${totalFreeUnits} free units deducted directly from Central Warehouse)${settleNote}`
         );
       }
 
@@ -615,6 +670,82 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
               </div>
             </div>
 
+            {/* Bill-to-Bill Knock-off: Previous Bill Clearance Banner */}
+            {(() => {
+              if (!selectedCustomerId || selectedCustomerId === 'walk-in' || customerUnpaidBills.length === 0) {
+                return null;
+              }
+              const firstBill = customerUnpaidBills[0];
+              if (!firstBill) return null;
+              const dueAmount = (firstBill.balanceAmount !== undefined && firstBill.balanceAmount > 0)
+                ? firstBill.balanceAmount
+                : Math.max(0, firstBill.netTotal - (firstBill.paidAmount || 0));
+
+              return (
+                <div className="p-3.5 bg-amber-50/70 border border-amber-200/90 rounded-2xl animate-fadeIn space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-amber-200/80 text-amber-900 uppercase tracking-wide">
+                        Bill-To-Bill Knock-off
+                      </span>
+                      <span className="text-xs font-bold text-slate-800">
+                        Unpaid Previous Delivery Bill Found
+                      </span>
+                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={settlePreviousBill}
+                        onChange={(e) => setSettlePreviousBill(e.target.checked)}
+                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                      />
+                      <span className="text-xs font-bold text-slate-900">
+                        Collect & Settle Previous Bill Now
+                      </span>
+                    </label>
+                  </div>
+
+                  {settlePreviousBill && (
+                    <div className="p-2.5 bg-white rounded-xl border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-bold text-slate-900">
+                          Bill #{firstBill.paperBillNumber || firstBill.orderNumber}
+                        </span>
+                        <span className="text-slate-400">•</span>
+                        <span className="text-slate-500">
+                          Total {formatMoney(firstBill.netTotal)}
+                        </span>
+                        <span className="text-slate-400">•</span>
+                        <span className="font-mono font-bold text-rose-600">
+                          Due: {formatMoney(dueAmount)}
+                        </span>
+                        {firstBill.daysOpen !== undefined && (
+                          <span className="text-[10px] text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded font-medium">
+                            {firstBill.daysOpen === 0 ? 'Today' : `${firstBill.daysOpen}d ago`}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[11px] font-semibold text-slate-600">Settle Amount:</span>
+                        <div className="relative w-28">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            max={dueAmount}
+                            value={settleAmount}
+                            onChange={(e) => setSettleAmount(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 text-right"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             {/* Walk-in Customer Optional Quick Name / Phone */}
             {billMode === 'WALK_IN' && selectedCustomerId === 'walk-in' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-emerald-50/50 border border-emerald-100 rounded-2xl">
@@ -788,6 +919,21 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
                   </div>
                 </div>
               </div>
+
+              {/* Total Driver Cash Handover Breakdown if previous bill is settled */}
+              {settlePreviousBill && parseFloat(settleAmount) > 0 && (
+                <div className="p-3 bg-emerald-50/80 border border-emerald-200/90 rounded-xl flex items-center justify-between text-xs animate-fadeIn">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-emerald-900">Total Cash Collected Today:</span>
+                    <span className="text-slate-600">
+                      Current Bill Cash ({formatMoney(parseFloat(cashReceived) || 0)}) + Previous Bill Settle ({formatMoney(parseFloat(settleAmount) || 0)})
+                    </span>
+                  </div>
+                  <span className="font-mono font-extrabold text-sm text-emerald-700 bg-white px-2.5 py-1 rounded-lg border border-emerald-200">
+                    {formatMoney((parseFloat(cashReceived) || 0) + (parseFloat(settleAmount) || 0))}
+                  </span>
+                </div>
+              )}
 
               <div>
                 <input

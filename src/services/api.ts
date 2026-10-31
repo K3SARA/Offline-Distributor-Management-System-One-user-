@@ -73,6 +73,7 @@ export const LorryService = {
     paymentMethod: 'CASH' | 'CREDIT' | 'CHEQUE';
     cashReceived: number;
     notes?: string;
+    settlePreviousBills?: { orderId: string; amount: number; paymentMethod?: string }[];
   }) => api.post<Order>(`/lorries/${id}/bills`, payload).then(r => r.data),
   settleLorry: (id: string, payload: {
     loadingId: string;
@@ -91,6 +92,8 @@ export const CustomerService = {
     api.put<Customer>(`/customers/${id}`, data).then(r => r.data),
   getOrderHistory: (id: string) =>
     api.get<Order[]>(`/customers/${id}/orders`).then(r => r.data),
+  getUnpaidBills: (id: string) =>
+    api.get<Order[]>(`/customers/${id}/unpaid-bills`).then(r => r.data),
   recordPayment: (id: string, payload: {
     amount: number;
     paymentMethod?: 'CASH' | 'CHEQUE' | 'BANK_TRANSFER';
@@ -101,6 +104,7 @@ export const CustomerService = {
     notes?: string;
     collectedBy?: string;
     lorryId?: string;
+    allocations?: { orderId: string; amount: number }[];
   }) => api.post<{ message: string; payment: CustomerPayment; customer: Customer }>(`/customers/${id}/payments`, payload).then(r => r.data),
   getPayments: (id: string) =>
     api.get<CustomerPayment[]>(`/customers/${id}/payments`).then(r => r.data),
@@ -124,6 +128,7 @@ export const OrderService = {
     cashReceived?: number;
     notes?: string;
     lorryId?: string;
+    settlePreviousBills?: { orderId: string; amount: number; paymentMethod?: string }[];
   }) => api.post<Order>('/orders', payload).then(r => r.data),
   updateStatus: (id: string, status: string) =>
     api.patch<Order>(`/orders/${id}/status`, { status }).then(r => r.data)

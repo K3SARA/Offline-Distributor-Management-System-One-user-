@@ -458,15 +458,24 @@ export const Customers: React.FC<{ onViewInvoice?: (order: Order) => void }> = (
                             <p className="font-bold text-xs text-slate-900 font-mono">
                               {formatMoney(order.netTotal)}
                             </p>
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-0.5 ${
-                                order.paymentStatus === 'PAID'
-                                  ? 'bg-emerald-50 text-emerald-700'
-                                  : 'bg-amber-50 text-amber-700'
-                              }`}
-                            >
-                              {order.paymentStatus}
-                            </span>
+                            <div className="flex items-center justify-end gap-1.5 mt-0.5">
+                              {order.paymentStatus !== 'PAID' && (order.balanceAmount !== undefined ? order.balanceAmount : (order.netTotal - (order.paidAmount || 0))) > 0 && (
+                                <span className="text-[10px] font-mono font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">
+                                  Due: {formatMoney(order.balanceAmount !== undefined ? order.balanceAmount : Math.max(0, order.netTotal - (order.paidAmount || 0)))}
+                                </span>
+                              )}
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block ${
+                                  order.paymentStatus === 'PAID'
+                                    ? 'bg-emerald-50 text-emerald-700'
+                                    : order.paymentStatus === 'PARTIAL'
+                                    ? 'bg-amber-50 text-amber-700'
+                                    : 'bg-rose-50 text-rose-700'
+                                }`}
+                              >
+                                {order.paymentStatus}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       ))}

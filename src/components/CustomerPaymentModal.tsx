@@ -8,7 +8,7 @@ import {
   FileText,
   ArrowRight
 } from 'lucide-react';
-import { Customer, CustomerPayment, Lorry } from '../types';
+import { Customer, CustomerPayment, Lorry, Order } from '../types';
 import { CustomerService, LorryService } from '../services/api';
 import { useCurrency } from '../context/CurrencyContext';
 
@@ -37,17 +37,22 @@ export const CustomerPaymentModal: React.FC<CustomerPaymentModalProps> = ({
   const [collectedBy, setCollectedBy] = useState<string>('Office Counter');
   const [selectedLorryId, setSelectedLorryId] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+  const [unpaidBills, setUnpaidBills] = useState<Order[]>([]);
 
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && customer) {
       LorryService.getAll()
         .then(setLorries)
         .catch(() => {});
 
-      if (customer && customer.outstandingBalance > 0) {
+      CustomerService.getUnpaidBills(customer.id)
+        .then(setUnpaidBills)
+        .catch(() => setUnpaidBills([]));
+
+      if (customer.outstandingBalance > 0) {
         setAmount(customer.outstandingBalance.toString());
       } else {
         setAmount('');
@@ -201,6 +206,50 @@ export const CustomerPaymentModal: React.FC<CustomerPaymentModalProps> = ({
               </span>
             </div>
           </div>
+
+          {/* Bill-to-Bill Knock-off Breakdown (Ultra minimal) */}
+          {unpaidBills.length > 0 && (
+            <div className="p-3 bg-slate-50 border border-slate-200/70 rounded-2xl space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <span>Unsettled Bills ({unpaidBills.length})</span>
+                <span className="text-blue-600 font-semibold normal-case">FIFO auto-cleared</span>
+              </div>
+              <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                {unpaidBills.map((b) => {
+                  const billDue: number = (b.balanceAmount !== undefined && b.balanceAmount > 0)
+                    ? b.balanceAmount
+                    : Math.max(0, b.netTotal - (b.paidAmount || 0));
+                  return (
+                    <div
+                      key={b.id}
+                      onClick={() => handleQuickAmount(billDue)}
+                      className="cursor-pointer flex items-center justify-between px-2.5 py-1.5 bg-white rounded-xl border border-slate-200/80 hover:border-blue-400 hover:bg-blue-50/40 transition text-xs"
+                      title="Click to fill this bill's due amount"
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="font-mono font-bold text-slate-800 truncate">
+                          {b.paperBillNumber || b.orderNumber}
+                        </span>
+                        {b.daysOpen !== undefined && (
+                          <span className="text-[10px] text-slate-400">
+                            • {b.daysOpen === 0 ? 'Today' : `${b.daysOpen}d ago`}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-mono font-bold text-rose-600">
+                          {formatMoney(billDue)}
+                        </span>
+                        <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                          Settle
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Payment Amount Input */}
           <div>

@@ -154,6 +154,7 @@ export interface Customer {
   discountPercentage: number;
   creditLimit: number;
   outstandingBalance: number;
+  maxCreditInvoices?: number;
   createdAt: string;
   updatedAt: string;
   payments?: CustomerPayment[];
@@ -178,8 +179,20 @@ export interface CustomerPayment {
   collectedBy?: string | null;
   lorryId?: string | null;
   lorry?: Lorry | null;
+  allocations?: BillPaymentAllocation[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface BillPaymentAllocation {
+  id: string;
+  paymentId: string;
+  payment?: CustomerPayment;
+  orderId: string;
+  order?: Order;
+  amount: number;
+  notes?: string | null;
+  createdAt: string;
 }
 
 export interface OrderItem {
@@ -211,6 +224,10 @@ export interface Order {
   taxAmount: number;
   netTotal: number;
   cashReceived: number;
+  paidAmount?: number;
+  balanceAmount?: number;
+  daysOpen?: number;
+  allocations?: BillPaymentAllocation[];
   notes?: string | null;
   dispatchedAt?: string | null;
   deliveredAt?: string | null;

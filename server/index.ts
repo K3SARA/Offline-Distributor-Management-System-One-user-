@@ -842,7 +842,8 @@ app.post('/api/lorries/:id/bills', async (req: Request, res: Response) => {
     items,
     paymentMethod, // CASH, CREDIT, CHEQUE
     cashReceived,
-    notes
+    notes,
+    settlePreviousBills // optional array: [{ orderId: string, amount: number, paymentMethod?: string }]
   } = req.body;
 
   if (!customerId || !Array.isArray(items) || items.length === 0) {
@@ -942,6 +943,7 @@ app.post('/api/lorries/:id/bills', async (req: Request, res: Response) => {
 
       const paidAmount = parseFloat(cashReceived !== undefined ? cashReceived : (paymentMethod === 'CASH' ? netTotal : 0));
       const paymentStatus = paidAmount >= netTotal ? 'PAID' : (paidAmount > 0 ? 'PARTIAL' : 'UNPAID');
+      const balanceAmount = Math.max(0, netTotal - paidAmount);
 
       // Order number
       const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -970,6 +972,8 @@ app.post('/api/lorries/:id/bills', async (req: Request, res: Response) => {
           taxAmount: 0.0,
           netTotal,
           cashReceived: paidAmount,
+          paidAmount,
+          balanceAmount,
           notes: notes?.trim() || `Driver: ${lorry.driverName} (${lorry.vehicleNumber})`,
           dispatchedAt: new Date(),
           deliveredAt: new Date(),
@@ -985,8 +989,8 @@ app.post('/api/lorries/:id/bills', async (req: Request, res: Response) => {
         }
       });
 
-      // 4. Update Customer Outstanding Balance if credit/unpaid
-      const creditAmount = netTotal - paidAmount;
+      // 4. Update Customer Outstanding Balance if credit/unpaid on current order
+      const creditAmount = balanceAmount;
       if (creditAmount > 0) {
         await tx.customer.update({
           where: { id: customerId },
@@ -994,7 +998,88 @@ app.post('/api/lorries/:id/bills', async (req: Request, res: Response) => {
         });
       }
 
-      // 5. Update Loading sheet cumulative stats
+      // 5. Process Previous Bill Clearance (Bill-to-Bill Knock-off collected on this delivery visit)
+      let totalPreviousBillCollected = 0;
+      const settledReceipts: any[] = [];
+
+      if (Array.isArray(settlePreviousBills) && settlePreviousBills.length > 0) {
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const endOfToday = new Date();
+        endOfToday.setHours(23, 59, 59, 999);
+
+        for (const prevBill of settlePreviousBills) {
+          const prevPayAmount = parseFloat(prevBill.amount);
+          if (isNaN(prevPayAmount) || prevPayAmount <= 0) continue;
+
+          const targetOrder = await tx.order.findUnique({
+            where: { id: prevBill.orderId }
+          });
+          if (!targetOrder) continue;
+
+          const currentPaid = targetOrder.paidAmount || 0;
+          const currentBal = targetOrder.balanceAmount > 0
+            ? targetOrder.balanceAmount
+            : Math.max(0, targetOrder.netTotal - currentPaid);
+          const applyAmt = Math.min(prevPayAmount, currentBal);
+          if (applyAmt <= 0) continue;
+
+          const countTodayRcpt = await tx.customerPayment.count({
+            where: { createdAt: { gte: startOfToday, lte: endOfToday } }
+          });
+          const rcptNum: string = `RCPT-${todayStr}-${(countTodayRcpt + settledReceipts.length + 1).toString().padStart(4, '0')}`;
+
+          // Create payment receipt for previous bill clearance
+          const paymentReceipt: any = await tx.customerPayment.create({
+            data: {
+              receiptNumber: rcptNum,
+              customerId,
+              amount: applyAmt,
+              paymentMethod: prevBill.paymentMethod || 'CASH',
+              notes: `Cleared Previous Bill ${targetOrder.orderNumber} during Delivery ${orderNumber}`,
+              collectedBy: lorry.driverName || 'Driver',
+              lorryId
+            }
+          });
+
+          // Create allocation link
+          await tx.billPaymentAllocation.create({
+            data: {
+              paymentId: paymentReceipt.id,
+              orderId: targetOrder.id,
+              amount: applyAmt,
+              notes: `Delivery knock-off on ${orderNumber}`
+            }
+          });
+
+          // Update previous order paid amount and balance
+          const updatedPaid = currentPaid + applyAmt;
+          const updatedBal = Math.max(0, targetOrder.netTotal - updatedPaid);
+          const updatedStatus = updatedBal <= 0 ? 'PAID' : 'PARTIAL';
+
+          await tx.order.update({
+            where: { id: targetOrder.id },
+            data: {
+              paidAmount: updatedPaid,
+              balanceAmount: updatedBal,
+              cashReceived: updatedPaid,
+              paymentStatus: updatedStatus
+            }
+          });
+
+          // Decrement customer outstanding balance for cleared previous bill
+          await tx.customer.update({
+            where: { id: customerId },
+            data: { outstandingBalance: { decrement: applyAmt } }
+          });
+
+          totalPreviousBillCollected += applyAmt;
+          settledReceipts.push(paymentReceipt);
+        }
+      }
+
+      // 6. Update Loading sheet cumulative stats (Current bill cash + previous bill collected cash)
+      const totalCashFromVisit = paidAmount + totalPreviousBillCollected;
       if (activeLoading) {
         await tx.lorryLoading.update({
           where: { id: activeLoading.id },
@@ -1002,13 +1087,17 @@ app.post('/api/lorries/:id/bills', async (req: Request, res: Response) => {
             totalSoldItems: { increment: orderItemsToCreate.reduce((a, b) => a + b.quantity, 0) },
             totalFreeItems: { increment: orderItemsToCreate.reduce((a, b) => a + (b.freeQuantity || 0), 0) },
             totalSalesAmount: { increment: netTotal },
-            cashCollected: { increment: paidAmount },
+            cashCollected: { increment: totalCashFromVisit },
             creditGiven: { increment: creditAmount > 0 ? creditAmount : 0 }
           }
         });
       }
 
-      return newOrder;
+      return {
+        ...newOrder,
+        previousBillsSettled: settledReceipts,
+        totalPreviousBillCollected
+      };
     });
 
     res.status(201).json(orderResult);
@@ -1241,7 +1330,50 @@ app.get('/api/customers/:id/orders', async (req: Request, res: Response) => {
   }
 });
 
-// Record customer payment (settles credit balance owed)
+// Get unpaid / partially paid bills for a customer (for Bill-to-Bill knock-off)
+app.get('/api/customers/:id/unpaid-bills', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const unpaidOrders = await prisma.order.findMany({
+      where: {
+        customerId: id,
+        paymentStatus: { in: ['UNPAID', 'PARTIAL'] },
+        status: { not: 'CANCELLED' }
+      },
+      include: {
+        lorry: true,
+        route: true,
+        items: { include: { product: true } },
+        allocations: {
+          include: { payment: true },
+          orderBy: { createdAt: 'desc' }
+        }
+      },
+      orderBy: { createdAt: 'asc' } // Oldest first (FIFO)
+    });
+
+    const now = new Date().getTime();
+    const formatted = unpaidOrders.map(order => {
+      // Dynamic balance calculation if balanceAmount wasn't explicitly populated
+      const computedBalance = order.balanceAmount > 0
+        ? order.balanceAmount
+        : Math.max(0, order.netTotal - (order.paidAmount || 0));
+      const daysOpen = Math.floor((now - new Date(order.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+
+      return {
+        ...order,
+        balanceAmount: computedBalance,
+        daysOpen
+      };
+    });
+
+    res.json(formatted);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Record customer payment (settles credit balance owed with bill-to-bill knock-off)
 app.post('/api/customers/:id/payments', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -1254,7 +1386,8 @@ app.post('/api/customers/:id/payments', async (req: Request, res: Response) => {
       reference,
       notes,
       collectedBy,
-      lorryId
+      lorryId,
+      allocations // optional array of { orderId: string, amount: number }
     } = req.body;
 
     const payAmount = parseFloat(amount);
@@ -1285,9 +1418,9 @@ app.post('/api/customers/:id/payments', async (req: Request, res: Response) => {
     });
     const receiptNumber = `RCPT-${dateStr}-${(countToday + 1).toString().padStart(4, '0')}`;
 
-    // Execute in transaction: create payment receipt & decrement customer balance
-    const [payment, updatedCustomer] = await prisma.$transaction([
-      prisma.customerPayment.create({
+    // Execute in transaction: create payment receipt, create allocations, update bill balances, decrement customer balance
+    const result = await prisma.$transaction(async (tx) => {
+      const payment = await tx.customerPayment.create({
         data: {
           receiptNumber,
           customerId: id,
@@ -1305,20 +1438,111 @@ app.post('/api/customers/:id/payments', async (req: Request, res: Response) => {
           customer: true,
           lorry: true
         }
-      }),
-      prisma.customer.update({
+      });
+
+      // Bill-to-Bill Knock-off Allocation
+      let remainingToAllocate = payAmount;
+      const allocationRecords = [];
+
+      if (Array.isArray(allocations) && allocations.length > 0) {
+        // Specific user-defined allocations
+        for (const alloc of allocations) {
+          const allocAmt = parseFloat(alloc.amount);
+          if (allocAmt <= 0) continue;
+
+          const targetOrder = await tx.order.findUnique({ where: { id: alloc.orderId } });
+          if (!targetOrder) continue;
+
+          const currentPaid = targetOrder.paidAmount || 0;
+          const currentBal = targetOrder.balanceAmount > 0 ? targetOrder.balanceAmount : Math.max(0, targetOrder.netTotal - currentPaid);
+          const applyAmt = Math.min(allocAmt, currentBal);
+          const newPaid = currentPaid + applyAmt;
+          const newBal = Math.max(0, targetOrder.netTotal - newPaid);
+          const newStatus = newBal <= 0 ? 'PAID' : 'PARTIAL';
+
+          const createdAlloc = await tx.billPaymentAllocation.create({
+            data: {
+              paymentId: payment.id,
+              orderId: targetOrder.id,
+              amount: applyAmt,
+              notes: `Allocated to Bill ${targetOrder.orderNumber}`
+            }
+          });
+          allocationRecords.push(createdAlloc);
+
+          await tx.order.update({
+            where: { id: targetOrder.id },
+            data: {
+              paidAmount: newPaid,
+              balanceAmount: newBal,
+              cashReceived: newPaid,
+              paymentStatus: newStatus
+            }
+          });
+        }
+      } else {
+        // Automatic FIFO (First-In, First-Out) knock-off against oldest unpaid bills
+        const unpaidBills = await tx.order.findMany({
+          where: {
+            customerId: id,
+            paymentStatus: { in: ['UNPAID', 'PARTIAL'] },
+            status: { not: 'CANCELLED' }
+          },
+          orderBy: { createdAt: 'asc' }
+        });
+
+        for (const bill of unpaidBills) {
+          if (remainingToAllocate <= 0) break;
+
+          const currentPaid = bill.paidAmount || 0;
+          const currentBal = bill.balanceAmount > 0 ? bill.balanceAmount : Math.max(0, bill.netTotal - currentPaid);
+          if (currentBal <= 0) continue;
+
+          const applyAmt = Math.min(remainingToAllocate, currentBal);
+          remainingToAllocate -= applyAmt;
+
+          const newPaid = currentPaid + applyAmt;
+          const newBal = Math.max(0, bill.netTotal - newPaid);
+          const newStatus = newBal <= 0 ? 'PAID' : 'PARTIAL';
+
+          const createdAlloc = await tx.billPaymentAllocation.create({
+            data: {
+              paymentId: payment.id,
+              orderId: bill.id,
+              amount: applyAmt,
+              notes: `Auto FIFO knock-off for Bill ${bill.orderNumber}`
+            }
+          });
+          allocationRecords.push(createdAlloc);
+
+          await tx.order.update({
+            where: { id: bill.id },
+            data: {
+              paidAmount: newPaid,
+              balanceAmount: newBal,
+              cashReceived: newPaid,
+              paymentStatus: newStatus
+            }
+          });
+        }
+      }
+
+      const updatedCustomer = await tx.customer.update({
         where: { id },
         data: {
           outstandingBalance: { decrement: payAmount }
         },
         include: { route: true }
-      })
-    ]);
+      });
+
+      return { payment, allocations: allocationRecords, customer: updatedCustomer };
+    });
 
     res.status(201).json({
       message: `Payment of ${payAmount} recorded for ${customer.name}. Receipt: ${receiptNumber}.`,
-      payment,
-      customer: updatedCustomer
+      payment: result.payment,
+      allocations: result.allocations,
+      customer: result.customer
     });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -1331,7 +1555,21 @@ app.get('/api/customers/:id/payments', async (req: Request, res: Response) => {
     const { id } = req.params;
     const payments = await prisma.customerPayment.findMany({
       where: { customerId: id },
-      include: { lorry: true },
+      include: {
+        lorry: true,
+        allocations: {
+          include: {
+            order: {
+              select: {
+                id: true,
+                orderNumber: true,
+                netTotal: true,
+                paperBillNumber: true
+              }
+            }
+          }
+        }
+      },
       orderBy: { createdAt: 'desc' }
     });
     res.json(payments);
@@ -1340,25 +1578,48 @@ app.get('/api/customers/:id/payments', async (req: Request, res: Response) => {
   }
 });
 
-// Void / Delete customer payment (restores credit balance)
+// Void / Delete customer payment (restores credit balance and reverses allocations)
 app.delete('/api/customer-payments/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const payment = await prisma.customerPayment.findUniqueOrThrow({
-      where: { id }
+      where: { id },
+      include: { allocations: true }
     });
 
-    await prisma.$transaction([
-      prisma.customer.update({
+    await prisma.$transaction(async (tx) => {
+      // Revert allocations from orders
+      for (const alloc of payment.allocations) {
+        const order = await tx.order.findUnique({ where: { id: alloc.orderId } });
+        if (order) {
+          const newPaid = Math.max(0, (order.paidAmount || 0) - alloc.amount);
+          const newBal = Math.max(0, order.netTotal - newPaid);
+          const newStatus = newPaid <= 0 ? 'UNPAID' : (newBal <= 0 ? 'PAID' : 'PARTIAL');
+
+          await tx.order.update({
+            where: { id: order.id },
+            data: {
+              paidAmount: newPaid,
+              balanceAmount: newBal,
+              cashReceived: newPaid,
+              paymentStatus: newStatus
+            }
+          });
+        }
+        await tx.billPaymentAllocation.delete({ where: { id: alloc.id } });
+      }
+
+      await tx.customer.update({
         where: { id: payment.customerId },
         data: {
           outstandingBalance: { increment: payment.amount }
         }
-      }),
-      prisma.customerPayment.delete({
+      });
+
+      await tx.customerPayment.delete({
         where: { id }
-      })
-    ]);
+      });
+    });
 
     res.json({
       message: `Payment receipt ${payment.receiptNumber} voided. Customer balance restored by ${payment.amount}.`
@@ -1436,7 +1697,8 @@ app.post('/api/orders', async (req: Request, res: Response) => {
     paymentStatus,
     paymentMethod,
     cashReceived,
-    lorryId
+    lorryId,
+    settlePreviousBills
   } = req.body;
 
   if (lorryId) {
@@ -1522,6 +1784,7 @@ app.post('/api/orders', async (req: Request, res: Response) => {
 
       const paidAmount = parseFloat(cashReceived !== undefined && cashReceived !== '' ? cashReceived : (paymentMethod === 'CASH' ? netTotal : 0));
       const calculatedPaymentStatus = paymentStatus || (paidAmount >= netTotal ? 'PAID' : (paidAmount > 0 ? 'PARTIAL' : 'UNPAID'));
+      const balanceAmount = Math.max(0, netTotal - paidAmount);
 
       const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       const countToday = await tx.order.count({
@@ -1548,6 +1811,8 @@ app.post('/api/orders', async (req: Request, res: Response) => {
           taxAmount: 0.0,
           netTotal,
           cashReceived: paidAmount,
+          paidAmount,
+          balanceAmount,
           notes: notes?.trim() || (walkInName ? `Walk-in: ${walkInName}` : 'Warehouse Direct Counter Sale'),
           items: {
             create: orderItemsToCreate
@@ -1575,7 +1840,7 @@ app.post('/api/orders', async (req: Request, res: Response) => {
 
       // If credit given and customer is an account holder
       if (calculatedPaymentStatus !== 'PAID' && customer.code !== 'WALK-IN') {
-        const remainingCredit = netTotal - paidAmount;
+        const remainingCredit = balanceAmount;
         if (remainingCredit > 0) {
           await tx.customer.update({
             where: { id: customer.id },
@@ -1584,7 +1849,80 @@ app.post('/api/orders', async (req: Request, res: Response) => {
         }
       }
 
-      return createdOrder;
+      // Settle previous bills if provided for warehouse direct customer
+      const settledReceipts: any[] = [];
+      if (Array.isArray(settlePreviousBills) && settlePreviousBills.length > 0 && customer.code !== 'WALK-IN') {
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const endOfToday = new Date();
+        endOfToday.setHours(23, 59, 59, 999);
+
+        for (const prevBill of settlePreviousBills) {
+          const prevPayAmount = parseFloat(prevBill.amount);
+          if (isNaN(prevPayAmount) || prevPayAmount <= 0) continue;
+
+          const targetOrder = await tx.order.findUnique({ where: { id: prevBill.orderId } });
+          if (!targetOrder) continue;
+
+          const currentPaid = targetOrder.paidAmount || 0;
+          const currentBal = targetOrder.balanceAmount > 0
+            ? targetOrder.balanceAmount
+            : Math.max(0, targetOrder.netTotal - currentPaid);
+          const applyAmt = Math.min(prevPayAmount, currentBal);
+          if (applyAmt <= 0) continue;
+
+          const countTodayRcpt = await tx.customerPayment.count({
+            where: { createdAt: { gte: startOfToday, lte: endOfToday } }
+          });
+          const rcptNum: string = `RCPT-${todayStr}-${(countTodayRcpt + settledReceipts.length + 1).toString().padStart(4, '0')}`;
+
+          const paymentReceipt: any = await tx.customerPayment.create({
+            data: {
+              receiptNumber: rcptNum,
+              customerId: customer.id,
+              amount: applyAmt,
+              paymentMethod: prevBill.paymentMethod || 'CASH',
+              notes: `Cleared Previous Bill ${targetOrder.orderNumber} at Sales Counter`,
+              collectedBy: 'Warehouse Counter'
+            }
+          });
+
+          await tx.billPaymentAllocation.create({
+            data: {
+              paymentId: paymentReceipt.id,
+              orderId: targetOrder.id,
+              amount: applyAmt,
+              notes: `Counter knock-off on ${orderNumber}`
+            }
+          });
+
+          const updatedPaid = currentPaid + applyAmt;
+          const updatedBal = Math.max(0, targetOrder.netTotal - updatedPaid);
+          const updatedStatus = updatedBal <= 0 ? 'PAID' : 'PARTIAL';
+
+          await tx.order.update({
+            where: { id: targetOrder.id },
+            data: {
+              paidAmount: updatedPaid,
+              balanceAmount: updatedBal,
+              cashReceived: updatedPaid,
+              paymentStatus: updatedStatus
+            }
+          });
+
+          await tx.customer.update({
+            where: { id: customer.id },
+            data: { outstandingBalance: { decrement: applyAmt } }
+          });
+
+          settledReceipts.push(paymentReceipt);
+        }
+      }
+
+      return {
+        ...createdOrder,
+        previousBillsSettled: settledReceipts
+      };
     });
 
     res.status(201).json(newOrder);

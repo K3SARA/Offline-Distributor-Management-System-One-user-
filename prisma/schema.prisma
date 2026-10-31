@@ -152,6 +152,7 @@ model Customer {
   discountPercentage Float    @default(0.0) // Flat discount %
   creditLimit        Float    @default(50000.0)
   outstandingBalance Float    @default(0.0) // Current credit balance
+  maxCreditInvoices  Int      @default(1) // Max allowed unpaid bills before knock-off settlement required
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -181,6 +182,8 @@ model Order {
   taxAmount      Float @default(0.0)
   netTotal       Float
   cashReceived   Float @default(0.0)
+  paidAmount     Float @default(0.0) // Total amount paid against this specific bill
+  balanceAmount  Float @default(0.0) // Remaining unpaid balance on this bill
 
   notes        String?
   dispatchedAt DateTime?
@@ -188,7 +191,8 @@ model Order {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  items OrderItem[]
+  items       OrderItem[]
+  allocations BillPaymentAllocation[]
 }
 
 model OrderItem {
@@ -299,6 +303,22 @@ model CustomerPayment {
   lorry         Lorry?    @relation(fields: [lorryId], references: [id], onDelete: SetNull)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
+  allocations BillPaymentAllocation[]
+}
+
+// --------------------------------------------------------
+// 7.1 BILL-TO-BILL PAYMENT ALLOCATIONS (KNOCK-OFF LEDGER)
+// --------------------------------------------------------
+model BillPaymentAllocation {
+  id         String          @id @default(uuid())
+  paymentId  String
+  payment    CustomerPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  orderId    String
+  order      Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  amount     Float           // Amount knocked off this specific bill
+  notes      String?
+  createdAt  DateTime        @default(now())
 }
 
 // --------------------------------------------------------
