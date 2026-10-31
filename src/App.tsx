@@ -21,6 +21,7 @@ import { ProfitAndLoss } from './pages/ProfitAndLoss';
 import { Suppliers } from './pages/Suppliers';
 import { Expenses } from './pages/Expenses';
 import { Settings } from './pages/Settings';
+import { Manufacturing } from './pages/Manufacturing';
 import { InvoiceModal } from './components/InvoiceModal';
 import { CurrencyProvider, useCurrency, CURRENCIES } from './context/CurrencyContext';
 import { Order } from './types';
@@ -106,6 +107,10 @@ export const AppContent: React.FC = () => {
 
           <div className={currentTab === 'suppliers' ? '' : 'hidden'}>
             <Suppliers />
+          </div>
+
+          <div className={currentTab === 'manufacturing' ? '' : 'hidden'}>
+            <Manufacturing />
           </div>
 
           <div className={currentTab === 'lorry-loading' ? '' : 'hidden'}>

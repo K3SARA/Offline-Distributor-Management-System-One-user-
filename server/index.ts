@@ -30,7 +30,7 @@ app.get('/api/health', (req, res) => {
 // List all products
 app.get('/api/products', async (req: Request, res: Response) => {
   try {
-    const { lowStock, search } = req.query;
+    const { lowStock, search, isRawMaterial } = req.query;
     const where: any = {};
 
     if (search && typeof search === 'string') {
@@ -39,6 +39,10 @@ app.get('/api/products', async (req: Request, res: Response) => {
         { sku: { contains: search } },
         { category: { contains: search } }
       ];
+    }
+
+    if (isRawMaterial !== undefined && isRawMaterial !== 'ALL') {
+      where.isRawMaterial = isRawMaterial === 'true';
     }
 
     const products = await prisma.product.findMany({
@@ -72,7 +76,7 @@ app.post('/api/products', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'SKU, Name, and Unit Price are required.' });
     }
 
-    const { freeRatioBuy, freeRatioGet } = req.body;
+    const { freeRatioBuy, freeRatioGet, isRawMaterial } = req.body;
 
     const product = await prisma.product.create({
       data: {
@@ -85,7 +89,8 @@ app.post('/api/products', async (req: Request, res: Response) => {
         currentStock: parseInt(currentStock || 0, 10),
         minStockAlert: parseInt(minStockAlert || 10, 10),
         freeRatioBuy: freeRatioBuy ? parseInt(freeRatioBuy, 10) : 0,
-        freeRatioGet: freeRatioGet ? parseInt(freeRatioGet, 10) : 0
+        freeRatioGet: freeRatioGet ? parseInt(freeRatioGet, 10) : 0,
+        isRawMaterial: isRawMaterial ? Boolean(isRawMaterial) : false
       }
     });
 
@@ -110,7 +115,7 @@ app.post('/api/products', async (req: Request, res: Response) => {
 app.put('/api/products/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { sku, name, category, unit, unitPrice, costPrice, minStockAlert, freeRatioBuy, freeRatioGet } = req.body;
+    const { sku, name, category, unit, unitPrice, costPrice, minStockAlert, freeRatioBuy, freeRatioGet, isRawMaterial } = req.body;
 
     const updated = await prisma.product.update({
       where: { id },
@@ -123,7 +128,8 @@ app.put('/api/products/:id', async (req: Request, res: Response) => {
         costPrice: costPrice !== undefined ? parseFloat(costPrice) : undefined,
         minStockAlert: minStockAlert !== undefined ? parseInt(minStockAlert, 10) : undefined,
         freeRatioBuy: freeRatioBuy !== undefined ? parseInt(freeRatioBuy, 10) : undefined,
-        freeRatioGet: freeRatioGet !== undefined ? parseInt(freeRatioGet, 10) : undefined
+        freeRatioGet: freeRatioGet !== undefined ? parseInt(freeRatioGet, 10) : undefined,
+        isRawMaterial: isRawMaterial !== undefined ? Boolean(isRawMaterial) : undefined
       }
     });
 
@@ -2544,6 +2550,484 @@ app.delete('/api/expenses/:id', async (req: Request, res: Response) => {
     res.json({ success: true, message: 'Expense record deleted.' });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
+  }
+});
+
+// ========================================================
+// 8. MANUFACTURING, BOM RECIPES & PRODUCTION RUNS
+// ========================================================
+
+// 1. List recipes with product and components
+app.get('/api/manufacturing/recipes', async (req: Request, res: Response) => {
+  try {
+    const { search } = req.query;
+    const where: any = {};
+    if (search && typeof search === 'string') {
+      where.OR = [
+        { name: { contains: search } },
+        { code: { contains: search } },
+        { product: { name: { contains: search } } }
+      ];
+    }
+
+    const recipes = await prisma.recipe.findMany({
+      where,
+      include: {
+        product: true,
+        items: {
+          include: { componentProduct: true }
+        },
+        _count: { select: { productionRuns: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(recipes);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 2. Get single recipe by ID
+app.get('/api/manufacturing/recipes/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const recipe = await prisma.recipe.findUniqueOrThrow({
+      where: { id },
+      include: {
+        product: true,
+        items: {
+          include: { componentProduct: true }
+        },
+        productionRuns: {
+          take: 10,
+          orderBy: { createdAt: 'desc' }
+        }
+      }
+    });
+    res.json(recipe);
+  } catch (error: any) {
+    res.status(404).json({ error: error.message });
+  }
+});
+
+// 3. Create a new BOM Recipe
+app.post('/api/manufacturing/recipes', async (req: Request, res: Response) => {
+  try {
+    const { name, productId, outputYield, estimatedOverheadCost, notes, items } = req.body;
+
+    if (!name || !productId || !items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Recipe name, target finished product, and at least 1 raw material / component are required.' });
+    }
+
+    const count = await prisma.recipe.count();
+    const code = `BOM-${(count + 1).toString().padStart(3, '0')}`;
+
+    const recipe = await prisma.recipe.create({
+      data: {
+        code,
+        name: name.trim(),
+        productId,
+        outputYield: parseInt(outputYield || 1, 10),
+        estimatedOverheadCost: parseFloat(estimatedOverheadCost || 0),
+        notes: notes?.trim() || null,
+        items: {
+          create: items.map((it: any) => ({
+            componentProductId: it.componentProductId,
+            quantity: parseFloat(it.quantity || 1),
+            notes: it.notes?.trim() || null
+          }))
+        }
+      },
+      include: {
+        product: true,
+        items: {
+          include: { componentProduct: true }
+        }
+      }
+    });
+
+    res.status(201).json(recipe);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// 4. Update a BOM Recipe
+app.put('/api/manufacturing/recipes/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, productId, outputYield, estimatedOverheadCost, notes, items } = req.body;
+
+    const data: any = {};
+    if (name !== undefined) data.name = name.trim();
+    if (productId !== undefined) data.productId = productId;
+    if (outputYield !== undefined) data.outputYield = parseInt(outputYield, 10);
+    if (estimatedOverheadCost !== undefined) data.estimatedOverheadCost = parseFloat(estimatedOverheadCost);
+    if (notes !== undefined) data.notes = notes?.trim() || null;
+
+    if (items && Array.isArray(items)) {
+      // Replace items
+      await prisma.recipeItem.deleteMany({ where: { recipeId: id } });
+      data.items = {
+        create: items.map((it: any) => ({
+          componentProductId: it.componentProductId,
+          quantity: parseFloat(it.quantity || 1),
+          notes: it.notes?.trim() || null
+        }))
+      };
+    }
+
+    const updated = await prisma.recipe.update({
+      where: { id },
+      data,
+      include: {
+        product: true,
+        items: {
+          include: { componentProduct: true }
+        }
+      }
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// 5. Delete a Recipe
+app.delete('/api/manufacturing/recipes/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await prisma.recipe.delete({ where: { id } });
+    res.json({ success: true, message: 'Recipe removed successfully.' });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// 6. List Production Runs
+app.get('/api/manufacturing/production-runs', async (req: Request, res: Response) => {
+  try {
+    const { recipeId, status, from, to } = req.query;
+    const where: any = {};
+    if (recipeId && typeof recipeId === 'string' && recipeId !== 'ALL') where.recipeId = recipeId;
+    if (status && typeof status === 'string' && status !== 'ALL') where.status = status;
+    if (from || to) {
+      where.createdAt = {};
+      if (from) where.createdAt.gte = new Date(from as string);
+      if (to) where.createdAt.lte = new Date(to as string);
+    }
+
+    const runs = await prisma.productionRun.findMany({
+      where,
+      include: {
+        recipe: {
+          include: { product: true }
+        },
+        items: {
+          include: { product: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(runs);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 7. Get single Production Run
+app.get('/api/manufacturing/production-runs/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const run = await prisma.productionRun.findUniqueOrThrow({
+      where: { id },
+      include: {
+        recipe: {
+          include: { product: true }
+        },
+        items: {
+          include: { product: true }
+        }
+      }
+    });
+    res.json(run);
+  } catch (error: any) {
+    res.status(404).json({ error: error.message });
+  }
+});
+
+// 8. Create & Execute a Production Run
+app.post('/api/manufacturing/production-runs', async (req: Request, res: Response) => {
+  try {
+    const {
+      recipeId,
+      targetQuantity,
+      actualQuantity,
+      overheadCost,
+      producedBy,
+      notes,
+      completeImmediately = true
+    } = req.body;
+
+    const plannedQty = parseInt(targetQuantity, 10);
+    if (isNaN(plannedQty) || plannedQty <= 0) {
+      return res.status(400).json({ error: 'Valid positive target quantity required.' });
+    }
+
+    const recipe = await prisma.recipe.findUniqueOrThrow({
+      where: { id: recipeId },
+      include: {
+        product: true,
+        items: {
+          include: { componentProduct: true }
+        }
+      }
+    });
+
+    const outputQty = actualQuantity !== undefined ? parseInt(actualQuantity, 10) : plannedQty;
+    const outputYield = recipe.outputYield || 1;
+    const batchMultiplier = outputQty / outputYield;
+
+    // Generate batch number BATCH-YYYYMMDD-XXXX
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+    const countToday = await prisma.productionRun.count({
+      where: {
+        createdAt: {
+          gte: new Date(new Date().setHours(0, 0, 0, 0)),
+          lte: new Date(new Date().setHours(23, 59, 59, 999))
+        }
+      }
+    });
+    const batchNumber = `BATCH-${dateStr}-${(countToday + 1).toString().padStart(4, '0')}`;
+
+    // Calculate component quantities and costs
+    let totalRawMaterialCost = 0;
+    const itemsData = recipe.items.map((item) => {
+      const requiredQty = item.quantity * batchMultiplier;
+      const unitCost = item.componentProduct.costPrice || 0;
+      const lineCost = requiredQty * unitCost;
+      totalRawMaterialCost += lineCost;
+
+      return {
+        productId: item.componentProductId,
+        plannedQuantity: requiredQty,
+        actualQuantity: requiredQty,
+        unitCost,
+        lineCost
+      };
+    });
+
+    const additionalOverhead = parseFloat(overheadCost !== undefined ? overheadCost : (recipe.estimatedOverheadCost * batchMultiplier)) || 0;
+    const totalProductionCost = totalRawMaterialCost + additionalOverhead;
+    const unitCost = outputQty > 0 ? (totalProductionCost / outputQty) : 0;
+
+    const runStatus = completeImmediately ? 'COMPLETED' : 'IN_PROGRESS';
+
+    // Execute in transaction
+    const productionRun = await prisma.$transaction(async (tx) => {
+      // Create ProductionRun record
+      const run = await tx.productionRun.create({
+        data: {
+          batchNumber,
+          recipeId,
+          targetQuantity: plannedQty,
+          actualQuantity: completeImmediately ? outputQty : 0,
+          status: runStatus,
+          totalRawMaterialCost,
+          overheadCost: additionalOverhead,
+          totalProductionCost,
+          unitCost,
+          producedBy: producedBy?.trim() || null,
+          notes: notes?.trim() || null,
+          startDate: today,
+          completedAt: completeImmediately ? today : null,
+          items: {
+            create: itemsData
+          }
+        },
+        include: {
+          recipe: { include: { product: true } },
+          items: { include: { product: true } }
+        }
+      });
+
+      if (completeImmediately) {
+        // 1. Deduct raw materials from warehouse stock
+        for (const item of itemsData) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              currentStock: { decrement: Math.round(item.actualQuantity) }
+            }
+          });
+
+          await tx.stockMovement.create({
+            data: {
+              productId: item.productId,
+              type: 'MANUFACTURING_CONSUMPTION',
+              quantity: -Math.round(item.actualQuantity),
+              referenceId: batchNumber,
+              notes: `Consumed in production batch ${batchNumber} for ${recipe.product.name}`
+            }
+          });
+        }
+
+        // 2. Add finished product to warehouse stock and update costPrice
+        await tx.product.update({
+          where: { id: recipe.productId },
+          data: {
+            currentStock: { increment: outputQty },
+            costPrice: unitCost > 0 ? parseFloat(unitCost.toFixed(2)) : undefined
+          }
+        });
+
+        await tx.stockMovement.create({
+          data: {
+            productId: recipe.productId,
+            type: 'MANUFACTURING_OUTPUT',
+            quantity: outputQty,
+            referenceId: batchNumber,
+            notes: `Manufactured ${outputQty} units in production batch ${batchNumber}`
+          }
+        });
+      }
+
+      return run;
+    });
+
+    res.status(201).json(productionRun);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// 9. Complete an In-Progress Production Run
+app.post('/api/manufacturing/production-runs/:id/complete', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { actualQuantity, overheadCost, notes } = req.body;
+
+    const run = await prisma.productionRun.findUniqueOrThrow({
+      where: { id },
+      include: {
+        recipe: { include: { product: true } },
+        items: { include: { product: true } }
+      }
+    });
+
+    if (run.status === 'COMPLETED') {
+      return res.status(400).json({ error: 'Production run is already marked as completed.' });
+    }
+
+    const outputQty = actualQuantity !== undefined ? parseInt(actualQuantity, 10) : run.targetQuantity;
+    const completedAt = new Date();
+
+    const updatedRun = await prisma.$transaction(async (tx) => {
+      // 1. Deduct raw materials
+      for (const item of run.items) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: {
+            currentStock: { decrement: Math.round(item.actualQuantity) }
+          }
+        });
+
+        await tx.stockMovement.create({
+          data: {
+            productId: item.productId,
+            type: 'MANUFACTURING_CONSUMPTION',
+            quantity: -Math.round(item.actualQuantity),
+            referenceId: run.batchNumber,
+            notes: `Consumed in batch ${run.batchNumber}`
+          }
+        });
+      }
+
+      // 2. Add finished product
+      await tx.product.update({
+        where: { id: run.recipe.productId },
+        data: {
+          currentStock: { increment: outputQty },
+          costPrice: run.unitCost > 0 ? parseFloat(run.unitCost.toFixed(2)) : undefined
+        }
+      });
+
+      await tx.stockMovement.create({
+        data: {
+          productId: run.recipe.productId,
+          type: 'MANUFACTURING_OUTPUT',
+          quantity: outputQty,
+          referenceId: run.batchNumber,
+          notes: `Manufactured ${outputQty} units in batch ${run.batchNumber}`
+        }
+      });
+
+      return tx.productionRun.update({
+        where: { id },
+        data: {
+          status: 'COMPLETED',
+          actualQuantity: outputQty,
+          completedAt,
+          notes: notes !== undefined ? notes : run.notes
+        },
+        include: {
+          recipe: { include: { product: true } },
+          items: { include: { product: true } }
+        }
+      });
+    });
+
+    res.json(updatedRun);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// 10. Cancel a Production Run
+app.post('/api/manufacturing/production-runs/:id/cancel', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const run = await prisma.productionRun.findUniqueOrThrow({ where: { id } });
+    if (run.status === 'COMPLETED') {
+      return res.status(400).json({ error: 'Cannot cancel an already completed production run.' });
+    }
+
+    const updated = await prisma.productionRun.update({
+      where: { id },
+      data: { status: 'CANCELLED' }
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// 11. Manufacturing Summary Stats
+app.get('/api/manufacturing/summary', async (req: Request, res: Response) => {
+  try {
+    const [totalRuns, activeRecipes, completedRunsAgg] = await Promise.all([
+      prisma.productionRun.count(),
+      prisma.recipe.count(),
+      prisma.productionRun.aggregate({
+        where: { status: 'COMPLETED' },
+        _sum: {
+          actualQuantity: true,
+          totalProductionCost: true
+        }
+      })
+    ]);
+
+    res.json({
+      totalBatchesCount: totalRuns,
+      totalUnitsManufactured: completedRunsAgg._sum.actualQuantity || 0,
+      totalProductionCost: completedRunsAgg._sum.totalProductionCost || 0,
+      activeRecipesCount: activeRecipes
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
   }
 });
 

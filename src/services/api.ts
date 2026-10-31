@@ -14,7 +14,10 @@ import {
   PurchaseOrder,
   Expense,
   ExpenseSummary,
-  CustomerPayment
+  CustomerPayment,
+  Recipe,
+  ProductionRun,
+  ManufacturingSummary
 } from '../types';
 
 // Dynamic API URL: uses relative '/api' on Railway / production web,
@@ -208,5 +211,50 @@ export const ExpenseService = {
     api.put<Expense>(`/expenses/${id}`, data).then(r => r.data),
   delete: (id: string) =>
     api.delete<{ success: boolean; message: string }>(`/expenses/${id}`).then(r => r.data)
+};
+
+export const ManufacturingService = {
+  getRecipes: (search?: string) =>
+    api.get<Recipe[]>('/manufacturing/recipes', { params: { search } }).then(r => r.data),
+  getRecipeById: (id: string) =>
+    api.get<Recipe>(`/manufacturing/recipes/${id}`).then(r => r.data),
+  createRecipe: (data: {
+    name: string;
+    productId: string;
+    outputYield?: number;
+    estimatedOverheadCost?: number;
+    notes?: string;
+    items: { componentProductId: string; quantity: number; notes?: string }[];
+  }) => api.post<Recipe>('/manufacturing/recipes', data).then(r => r.data),
+  updateRecipe: (id: string, data: Partial<{
+    name: string;
+    productId: string;
+    outputYield: number;
+    estimatedOverheadCost: number;
+    notes: string;
+    items: { componentProductId: string; quantity: number; notes?: string }[];
+  }>) => api.put<Recipe>(`/manufacturing/recipes/${id}`, data).then(r => r.data),
+  deleteRecipe: (id: string) =>
+    api.delete<{ success: boolean; message: string }>(`/manufacturing/recipes/${id}`).then(r => r.data),
+
+  getProductionRuns: (params?: { recipeId?: string; status?: string; from?: string; to?: string }) =>
+    api.get<ProductionRun[]>('/manufacturing/production-runs', { params }).then(r => r.data),
+  getProductionRunById: (id: string) =>
+    api.get<ProductionRun>(`/manufacturing/production-runs/${id}`).then(r => r.data),
+  createProductionRun: (data: {
+    recipeId: string;
+    targetQuantity: number;
+    actualQuantity?: number;
+    overheadCost?: number;
+    producedBy?: string;
+    notes?: string;
+    completeImmediately?: boolean;
+  }) => api.post<ProductionRun>('/manufacturing/production-runs', data).then(r => r.data),
+  completeProductionRun: (id: string, data?: { actualQuantity?: number; overheadCost?: number; notes?: string }) =>
+    api.post<ProductionRun>(`/manufacturing/production-runs/${id}/complete`, data || {}).then(r => r.data),
+  cancelProductionRun: (id: string) =>
+    api.post<ProductionRun>(`/manufacturing/production-runs/${id}/cancel`).then(r => r.data),
+  getSummary: () =>
+    api.get<ManufacturingSummary>('/manufacturing/summary').then(r => r.data)
 };
 

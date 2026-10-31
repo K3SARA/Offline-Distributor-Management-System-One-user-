@@ -28,6 +28,7 @@ export const Inventory: React.FC<InventoryProps> = ({ onNavigateToSuppliers }) =
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [lowStockOnly, setLowStockOnly] = useState(false);
+  const [materialFilter, setMaterialFilter] = useState<'ALL' | 'FINISHED' | 'RAW'>('ALL');
 
   // Modal states
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -127,17 +128,50 @@ export const Inventory: React.FC<InventoryProps> = ({ onNavigateToSuppliers }) =
           />
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/60">
+            <button
+              onClick={() => setMaterialFilter('ALL')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
+                materialFilter === 'ALL'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setMaterialFilter('FINISHED')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
+                materialFilter === 'FINISHED'
+                  ? 'bg-white text-blue-600 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Finished Goods
+            </button>
+            <button
+              onClick={() => setMaterialFilter('RAW')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
+                materialFilter === 'RAW'
+                  ? 'bg-white text-purple-600 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Raw Materials
+            </button>
+          </div>
+
           <button
             onClick={() => setLowStockOnly(!lowStockOnly)}
-            className={`w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 border transition ${
+            className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border transition ${
               lowStockOnly
                 ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
                 : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
           >
             <AlertTriangle className="w-3.5 h-3.5" />
-            {lowStockOnly ? 'Low Stock Only' : 'Filter Low Stock Alert'}
+            <span>{lowStockOnly ? 'Low Stock Only' : 'Low Stock Alert'}</span>
           </button>
         </div>
       </div>
@@ -158,14 +192,24 @@ export const Inventory: React.FC<InventoryProps> = ({ onNavigateToSuppliers }) =
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {products.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-7 py-16 text-center text-slate-400">
-                    No products found matching your search.
-                  </td>
-                </tr>
-              ) : (
-                products.map((p) => {
+              {(() => {
+                const filteredProducts = products.filter(p => {
+                  if (materialFilter === 'FINISHED') return !p.isRawMaterial;
+                  if (materialFilter === 'RAW') return Boolean(p.isRawMaterial);
+                  return true;
+                });
+
+                if (filteredProducts.length === 0) {
+                  return (
+                    <tr>
+                      <td colSpan={7} className="px-7 py-16 text-center text-slate-400">
+                        No products found matching your search and filter.
+                      </td>
+                    </tr>
+                  );
+                }
+
+                return filteredProducts.map((p) => {
                   const isLow = p.currentStock <= p.minStockAlert;
                   const totalInLorries = p.lorryStocks?.reduce((acc, s) => acc + s.quantity, 0) || 0;
 
@@ -178,6 +222,11 @@ export const Inventory: React.FC<InventoryProps> = ({ onNavigateToSuppliers }) =
                         <span className="font-semibold text-slate-900 block text-sm">{p.name}</span>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-xs text-slate-400">Pack: {p.unit}</span>
+                          {p.isRawMaterial && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 border border-purple-200/60 font-mono">
+                              Raw Material
+                            </span>
+                          )}
                           {p.freeRatioBuy && p.freeRatioBuy > 0 && p.freeRatioGet ? (
                             <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-semibold rounded-md text-xs">
                               Promo: Buy {p.freeRatioBuy} + {p.freeRatioGet} Free
@@ -243,8 +292,8 @@ export const Inventory: React.FC<InventoryProps> = ({ onNavigateToSuppliers }) =
                       </td>
                     </tr>
                   );
-                })
-              )}
+                });
+              })()}
             </tbody>
           </table>
         </div>

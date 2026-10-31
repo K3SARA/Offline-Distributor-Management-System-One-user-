@@ -28,7 +28,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     currentStock: '0',
     minStockAlert: '10',
     freeRatioBuy: '0',
-    freeRatioGet: '0'
+    freeRatioGet: '0',
+    isRawMaterial: false
   });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -45,7 +46,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         currentStock: product.currentStock.toString(),
         minStockAlert: product.minStockAlert.toString(),
         freeRatioBuy: (product.freeRatioBuy || 0).toString(),
-        freeRatioGet: (product.freeRatioGet || 0).toString()
+        freeRatioGet: (product.freeRatioGet || 0).toString(),
+        isRawMaterial: Boolean(product.isRawMaterial)
       });
     } else {
       setFormData({
@@ -58,7 +60,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         currentStock: '0',
         minStockAlert: '10',
         freeRatioBuy: '0',
-        freeRatioGet: '0'
+        freeRatioGet: '0',
+        isRawMaterial: false
       });
     }
     setError(null);
@@ -87,7 +90,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({
           costPrice: parseFloat(formData.costPrice || '0'),
           minStockAlert: parseInt(formData.minStockAlert, 10),
           freeRatioBuy: parseInt(formData.freeRatioBuy, 10) || 0,
-          freeRatioGet: parseInt(formData.freeRatioGet, 10) || 0
+          freeRatioGet: parseInt(formData.freeRatioGet, 10) || 0,
+          isRawMaterial: formData.isRawMaterial
         });
       } else {
         await ProductService.create({
@@ -100,7 +104,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({
           currentStock: parseInt(formData.currentStock, 10),
           minStockAlert: parseInt(formData.minStockAlert, 10),
           freeRatioBuy: parseInt(formData.freeRatioBuy, 10) || 0,
-          freeRatioGet: parseInt(formData.freeRatioGet, 10) || 0
+          freeRatioGet: parseInt(formData.freeRatioGet, 10) || 0,
+          isRawMaterial: formData.isRawMaterial
         });
       }
       onSaved();
@@ -293,6 +298,27 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                 ? `Active offer: Buy ${formData.freeRatioBuy} get ${formData.freeRatioGet} Free. Office Bill Entry will auto-suggest free units.`
                 : 'No default offer. Free issues can still be entered manually during bill entry.'}
             </p>
+          </div>
+
+          {/* Raw Material / Component Flag */}
+          <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80">
+            <div>
+              <span className="text-xs font-bold text-slate-800 block">
+                Raw Material / Manufacturing Component
+              </span>
+              <span className="text-[11px] text-slate-500">
+                Ingredient or packaging item consumed in Manufacturing BOM production runs.
+              </span>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.isRawMaterial}
+                onChange={(e) => setFormData({ ...formData, isRawMaterial: e.target.checked })}
+                className="sr-only peer"
+              />
+              <div className="w-10 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">

@@ -77,6 +77,7 @@ export interface Product {
   minStockAlert: number;
   freeRatioBuy?: number;
   freeRatioGet?: number;
+  isRawMaterial?: boolean;
   supplierId?: string | null;
   supplier?: Supplier | null;
   createdAt: string;
@@ -392,6 +393,69 @@ export interface ProfitAndLossReport {
     margin: number;
     expenses?: number;
   }>;
+}
+
+export interface RecipeItem {
+  id: string;
+  recipeId: string;
+  componentProductId: string;
+  componentProduct?: Product;
+  quantity: number;
+  notes?: string | null;
+}
+
+export interface Recipe {
+  id: string;
+  code: string;
+  name: string;
+  productId: string;
+  product?: Product;
+  outputYield: number;
+  estimatedOverheadCost: number;
+  notes?: string | null;
+  items: RecipeItem[];
+  productionRuns?: ProductionRun[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductionRunItem {
+  id: string;
+  productionRunId: string;
+  productId: string;
+  product?: Product;
+  plannedQuantity: number;
+  actualQuantity: number;
+  unitCost: number;
+  lineCost: number;
+}
+
+export interface ProductionRun {
+  id: string;
+  batchNumber: string;
+  recipeId: string;
+  recipe?: Recipe;
+  targetQuantity: number;
+  actualQuantity: number;
+  status: 'DRAFT' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  totalRawMaterialCost: number;
+  overheadCost: number;
+  totalProductionCost: number;
+  unitCost: number;
+  producedBy?: string | null;
+  notes?: string | null;
+  startDate: string;
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items?: ProductionRunItem[];
+}
+
+export interface ManufacturingSummary {
+  totalBatchesCount: number;
+  totalUnitsManufactured: number;
+  totalProductionCost: number;
+  activeRecipesCount: number;
 }
 
 

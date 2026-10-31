@@ -14,6 +14,7 @@ import {
   TrendingUp,
   TrendingDown,
   Building2,
+  Factory,
   X
 } from 'lucide-react';
 import { useCurrency, CURRENCIES, CurrencyCode } from '../context/CurrencyContext';
@@ -56,6 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         { id: 'inventory', label: 'Warehouse Stock', icon: Boxes, badge: 'Step 1', badgeTone: 'step' },
         { id: 'suppliers', label: 'Suppliers', icon: Building2, badge: 'Stock In', badgeTone: 'inward' },
+        { id: 'manufacturing', label: 'Manufacturing & BOM', icon: Factory, badge: 'Production', badgeTone: 'inward' },
         { id: 'lorry-loading', label: 'Morning Lorry Load', icon: Truck, badge: 'Step 2', badgeTone: 'step' },
         { id: 'bill-entry', label: 'Office Bill Entry', icon: Receipt, badge: 'Step 3', badgeTone: 'step' },
         { id: 'lorry-settlement', label: 'Day Settlement', icon: RotateCcw, badge: 'Step 4', badgeTone: 'step' }

@@ -22,6 +22,7 @@ model Product {
   minStockAlert Int      @default(10)
   freeRatioBuy  Int      @default(0) // Buy X (e.g. 10)
   freeRatioGet  Int      @default(0) // Get Y Free (e.g. 1)
+  isRawMaterial Boolean  @default(false) // Raw materials / packaging vs finished goods
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -33,6 +34,9 @@ model Product {
   lorryStocks        LorryStock[]
   loadingItems       LorryLoadingItem[]
   purchaseOrderItems PurchaseOrderItem[]
+  recipes            Recipe[]            @relation("ProductRecipes")
+  recipeItems        RecipeItem[]        @relation("RecipeComponents")
+  productionRunItems ProductionRunItem[] @relation("RunConsumedItems")
 }
 
 model StockMovement {
@@ -295,4 +299,67 @@ model CustomerPayment {
   lorry         Lorry?    @relation(fields: [lorryId], references: [id], onDelete: SetNull)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+}
+
+// --------------------------------------------------------
+// 8. MANUFACTURING, BOM RECIPES & PRODUCTION RUNS
+// --------------------------------------------------------
+model Recipe {
+  id                    String   @id @default(uuid())
+  code                  String   @unique // e.g. "BOM-001"
+  name                  String   // e.g. "Sunlight Detergent 1kg Packaging"
+  productId             String   // Target Finished Good
+  product               Product  @relation("ProductRecipes", fields: [productId], references: [id], onDelete: Cascade)
+  outputYield           Int      @default(1) // Units of finished product produced per batch
+  estimatedOverheadCost Float    @default(0.0) // Packaging / labor overhead per batch
+  notes                 String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  items          RecipeItem[]
+  productionRuns ProductionRun[]
+}
+
+model RecipeItem {
+  id                 String  @id @default(uuid())
+  recipeId           String
+  recipe             Recipe  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  componentProductId String  // Ingredient / Raw Material / Packaging component
+  componentProduct   Product @relation("RecipeComponents", fields: [componentProductId], references: [id])
+  quantity           Float   // Quantity needed per recipe output yield
+  notes              String?
+}
+
+model ProductionRun {
+  id                   String              @id @default(uuid())
+  batchNumber          String              @unique // e.g. "BATCH-20261031-0001"
+  recipeId             String
+  recipe               Recipe              @relation(fields: [recipeId], references: [id])
+  targetQuantity       Int                 // Planned units of finished goods
+  actualQuantity       Int                 @default(0) // Completed output units
+  status               String              @default("COMPLETED") // DRAFT, IN_PROGRESS, COMPLETED, CANCELLED
+  totalRawMaterialCost Float               @default(0.0)
+  overheadCost         Float               @default(0.0)
+  totalProductionCost  Float               @default(0.0)
+  unitCost             Float               @default(0.0)
+  producedBy           String?             // Shift / Operator / Supervisor
+  notes                String?
+  startDate            DateTime            @default(now())
+  completedAt          DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  items ProductionRunItem[]
+}
+
+model ProductionRunItem {
+  id              String        @id @default(uuid())
+  productionRunId String
+  productionRun   ProductionRun @relation(fields: [productionRunId], references: [id], onDelete: Cascade)
+  productId       String        // Component product consumed
+  product         Product       @relation("RunConsumedItems", fields: [productId], references: [id])
+  plannedQuantity Float
+  actualQuantity  Float
+  unitCost        Float
+  lineCost        Float
 }
