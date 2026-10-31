@@ -56,6 +56,58 @@ export const Settings: React.FC = () => {
   const [savingLorry, setSavingLorry] = useState(false);
   const [lorryError, setLorryError] = useState<string | null>(null);
 
+  // Add Route Modal State
+  const [showAddRouteModal, setShowAddRouteModal] = useState(false);
+  const [routeForm, setRouteForm] = useState({
+    code: '',
+    name: '',
+    description: ''
+  });
+  const [savingRoute, setSavingRoute] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+
+  const handleOpenAddRoute = () => {
+    const nextNum = routes.length + 1;
+    setRouteForm({
+      code: `R-${String(nextNum).padStart(2, '0')}`,
+      name: '',
+      description: ''
+    });
+    setRouteError(null);
+    setShowAddRouteModal(true);
+  };
+
+  const handleSaveRoute = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!routeForm.code.trim() || !routeForm.name.trim()) {
+      setRouteError('Route code and name are required.');
+      return;
+    }
+    try {
+      setSavingRoute(true);
+      setRouteError(null);
+      const created = await RouteService.create({
+        code: routeForm.code.trim().toUpperCase(),
+        name: routeForm.name.trim(),
+        description: routeForm.description.trim() || undefined
+      });
+
+      const updatedRoutes = [...routes.filter(r => r.id !== created.id), created];
+      setRoutes(updatedRoutes);
+
+      // Auto-assign newly created route in lorry form if active
+      setLorryForm(prev => ({ ...prev, routeId: created.id }));
+
+      setShowAddRouteModal(false);
+      setSaveSuccess(`Route "${created.name}" created and assigned!`);
+      setTimeout(() => setSaveSuccess(null), 4000);
+    } catch (err: any) {
+      setRouteError(err?.response?.data?.error || err.message || 'Failed to create route.');
+    } finally {
+      setSavingRoute(false);
+    }
+  };
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -234,12 +286,20 @@ export const Settings: React.FC = () => {
             </p>
           </div>
 
-          <button
-            onClick={handleOpenNewLorry}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-2xl shadow-sm transition"
-          >
-            <Plus className="w-4 h-4" /> Add Lorry
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleOpenAddRoute}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold rounded-2xl shadow-2xs transition"
+            >
+              <Plus className="w-4 h-4 text-blue-600" /> Add Route
+            </button>
+            <button
+              onClick={handleOpenNewLorry}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-2xl shadow-sm transition"
+            >
+              <Plus className="w-4 h-4" /> Add Lorry
+            </button>
+          </div>
         </div>
 
         {/* Lorry Fleet Grid */}
@@ -592,21 +652,43 @@ export const Settings: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
-                  Assigned Route
-                </label>
-                <select
-                  value={lorryForm.routeId}
-                  onChange={(e) => setLorryForm({ ...lorryForm, routeId: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">-- No Route Assigned --</option>
-                  {routes.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.code} - {r.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Assigned Route
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleOpenAddRoute}
+                    className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 transition hover:underline"
+                    title="Create New Delivery Route"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    New Route
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={lorryForm.routeId}
+                    onChange={(e) => setLorryForm({ ...lorryForm, routeId: e.target.value })}
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- No Route Assigned --</option>
+                    {routes.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.code} - {r.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleOpenAddRoute}
+                    className="w-10 h-10 rounded-xl bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white border border-blue-200/80 flex items-center justify-center transition shadow-2xs shrink-0 group"
+                    title="Add New Delivery Route"
+                    aria-label="Add Route"
+                  >
+                    <Plus className="w-5 h-5 stroke-[2.2] group-hover:scale-110 transition-transform" />
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -637,6 +719,100 @@ export const Settings: React.FC = () => {
                   className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-sm transition disabled:opacity-50"
                 >
                   {savingLorry ? 'Saving...' : 'Save Lorry Details'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ADD NEW ROUTE MODAL */}
+      {showAddRouteModal && (
+        <div className="fixed inset-0 z-60 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden animate-scaleIn border border-slate-100">
+            <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Compass className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">Add Delivery Route</h3>
+                  <p className="text-xs text-slate-400">Create a new delivery territory for your fleet</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowAddRouteModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveRoute} className="p-6 space-y-4">
+              {routeError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-semibold">
+                  {routeError}
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                  Route Code *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. R-04 or R-COL-02"
+                  value={routeForm.code}
+                  onChange={(e) => setRouteForm({ ...routeForm, code: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                  Route Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Route 4 - Galle Southern Coastal"
+                  value={routeForm.name}
+                  onChange={(e) => setRouteForm({ ...routeForm, name: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                  Territory / Locality Description
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Retail supermarkets & grocery shops along Galle Road from Dehiwala to Panadura"
+                  value={routeForm.description}
+                  onChange={(e) => setRouteForm({ ...routeForm, description: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowAddRouteModal(false)}
+                  className="px-4 py-2.5 text-slate-600 hover:text-slate-800 font-semibold text-xs rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingRoute}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-sm transition disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  {savingRoute ? 'Saving...' : 'Save & Assign Route'}
                 </button>
               </div>
             </form>
