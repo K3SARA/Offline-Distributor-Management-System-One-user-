@@ -17,6 +17,7 @@ import { BillEntry } from './pages/BillEntry';
 import { LorrySettlement } from './pages/LorrySettlement';
 import { Customers } from './pages/Customers';
 import { Reports } from './pages/Reports';
+import { Settings } from './pages/Settings';
 import { InvoiceModal } from './components/InvoiceModal';
 import { CurrencyProvider, useCurrency, CURRENCIES } from './context/CurrencyContext';
 import { Order } from './types';
@@ -110,6 +111,8 @@ export const AppContent: React.FC = () => {
           )}
 
           {currentTab === 'reports' && <Reports />}
+
+          {currentTab === 'settings' && <Settings />}
         </div>
 
         {/* Mobile Bottom Navigation Bar (md:hidden) */}

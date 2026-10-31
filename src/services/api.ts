@@ -7,7 +7,8 @@ import {
   StockMovement,
   Route,
   Lorry,
-  LorryLoading
+  LorryLoading,
+  SystemSettings
 } from '../types';
 
 // Dynamic API URL: uses relative '/api' on Railway / production web,
@@ -47,6 +48,8 @@ export const LorryService = {
     api.get<Lorry[]>('/lorries').then(r => r.data),
   getById: (id: string) =>
     api.get<Lorry>(`/lorries/${id}`).then(r => r.data),
+  create: (data: { vehicleNumber: string; driverName: string; driverPhone?: string; routeId?: string; status?: string }) =>
+    api.post<Lorry>('/lorries', data).then(r => r.data),
   update: (id: string, data: Partial<Lorry>) =>
     api.put<Lorry>(`/lorries/${id}`, data).then(r => r.data),
   loadMorningStock: (id: string, payload: { items: { productId: string; quantity: number }[]; notes?: string }) =>
@@ -111,4 +114,11 @@ export const ReportService = {
     api.get<StockMovement[]>('/reports/stock-movements', { params: { type, limit, from, to } }).then(r => r.data),
   getCustomerBalances: () =>
     api.get<any>('/reports/customer-balances').then(r => r.data)
+};
+
+export const SettingsService = {
+  get: () =>
+    api.get<SystemSettings>('/settings').then(r => r.data),
+  update: (data: Partial<SystemSettings>) =>
+    api.put<SystemSettings>('/settings', data).then(r => r.data)
 };

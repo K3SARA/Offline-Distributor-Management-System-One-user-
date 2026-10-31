@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Printer, Truck, Receipt } from 'lucide-react';
-import { Order } from '../types';
+import { Order, SystemSettings } from '../types';
 import { useCurrency } from '../context/CurrencyContext';
+import { SettingsService } from '../services/api';
 
 interface InvoiceModalProps {
   order: Order | null;
@@ -10,6 +11,16 @@ interface InvoiceModalProps {
 
 export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, onClose }) => {
   const { formatMoney } = useCurrency();
+  const [companySettings, setCompanySettings] = useState<SystemSettings | null>(null);
+
+  useEffect(() => {
+    if (order) {
+      SettingsService.get()
+        .then((s) => setCompanySettings(s))
+        .catch(() => {});
+    }
+  }, [order]);
+
   if (!order) return null;
 
   const handlePrint = () => {
@@ -71,9 +82,17 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, onClose }) =>
             </div>
 
             <div className="text-left sm:text-right">
-              <h3 className="font-bold text-sm sm:text-base text-slate-900">Distributor Logistics Depot</h3>
+              <h3 className="font-bold text-sm sm:text-base text-slate-900">
+                {companySettings?.companyName || 'Distributor Logistics Depot'}
+              </h3>
+              {companySettings?.address && (
+                <p className="text-xs text-slate-500">{companySettings.address}</p>
+              )}
+              {companySettings?.phone && (
+                <p className="text-xs text-slate-500 font-mono">Tel: {companySettings.phone}</p>
+              )}
               {order.lorry ? (
-                <div className="text-xs text-slate-600 mt-0.5 sm:mt-1 space-y-0.5">
+                <div className="text-xs text-slate-600 mt-1 space-y-0.5">
                   <p className="font-semibold text-slate-900">
                     Lorry: {order.lorry.vehicleNumber}
                   </p>
@@ -81,7 +100,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, onClose }) =>
                   <p className="text-blue-600 font-medium">Route: {order.route?.name || order.lorry.route?.name || 'Local Route'}</p>
                 </div>
               ) : (
-                <p className="text-xs text-slate-500">Warehouse Central Counter</p>
+                <p className="text-xs text-slate-500 mt-1">Warehouse Central Counter</p>
               )}
             </div>
           </div>
@@ -197,6 +216,13 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, onClose }) =>
               )}
             </div>
           </div>
+
+          {/* Policy / Terms Notice from Settings */}
+          {companySettings?.invoiceFooterNote && (
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-[11px] text-slate-500 text-center italic">
+              {companySettings.invoiceFooterNote}
+            </div>
+          )}
 
           {/* Delivery Signatures */}
           <div className="pt-6 sm:pt-8 grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 border-t border-slate-200 text-xs text-slate-400">

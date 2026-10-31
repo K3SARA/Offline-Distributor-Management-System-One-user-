@@ -283,21 +283,60 @@ app.get('/api/lorries/:id', async (req: Request, res: Response) => {
   }
 });
 
-// Update Lorry details
+// Create a new Lorry
+app.post('/api/lorries', async (req: Request, res: Response) => {
+  try {
+    const { vehicleNumber, driverName, driverPhone, routeId, status } = req.body;
+    if (!vehicleNumber || !driverName) {
+      return res.status(400).json({ error: 'Vehicle number and Driver name are required.' });
+    }
+
+    const lorry = await prisma.lorry.create({
+      data: {
+        vehicleNumber: vehicleNumber.trim().toUpperCase(),
+        driverName: driverName.trim(),
+        driverPhone: driverPhone?.trim() || null,
+        routeId: routeId || null,
+        status: status || 'ACTIVE'
+      },
+      include: { route: true }
+    });
+    res.json(lorry);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Update Lorry details (driver name, vehicle plate number, route, phone, status)
 app.put('/api/lorries/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { driverName, driverPhone, routeId, status } = req.body;
+    const { vehicleNumber, driverName, driverPhone, routeId, status } = req.body;
+
+    const data: any = {};
+    if (vehicleNumber !== undefined && vehicleNumber.trim() !== '') {
+      data.vehicleNumber = vehicleNumber.trim().toUpperCase();
+    }
+    if (driverName !== undefined && driverName.trim() !== '') {
+      data.driverName = driverName.trim();
+    }
+    if (driverPhone !== undefined) {
+      data.driverPhone = driverPhone.trim();
+    }
+    if (routeId !== undefined) {
+      data.routeId = routeId || null;
+    }
+    if (status !== undefined) {
+      data.status = status;
+    }
 
     const updated = await prisma.lorry.update({
       where: { id },
-      data: {
-        driverName: driverName?.trim(),
-        driverPhone: driverPhone?.trim(),
-        routeId: routeId || undefined,
-        status: status || undefined
-      },
-      include: { route: true }
+      data,
+      include: {
+        route: true,
+        lorryStocks: { include: { product: true } }
+      }
     });
     res.json(updated);
   } catch (error: any) {
@@ -1368,6 +1407,59 @@ app.get('/api/reports/customer-balances', async (_req: Request, res: Response) =
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ========================================================
+// 8. GENERAL & BUSINESS SETTINGS
+// ========================================================
+const SETTINGS_FILE = path.join(__dirname, '../settings.json');
+
+const defaultSettings = {
+  companyName: 'Distributor Pro Lanka (Pvt) Ltd',
+  tagline: 'Authorized Wholesale FMCG Distribution & Fleet Console',
+  phone: '+94 11 234 5678 / +94 77 123 4567',
+  email: 'distribution@example.com',
+  address: 'No. 88, Commercial Zone, Colombo, Sri Lanka',
+  registrationNumber: 'PV-84920/2022',
+  invoiceFooterNote: 'Goods once delivered and acknowledged on paper slip cannot be returned without formal warehouse return authorization.',
+  defaultCurrency: 'LKR',
+  defaultCreditLimit: 50000,
+  lowStockThreshold: 10
+};
+
+function getSettings() {
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      const data = fs.readFileSync(SETTINGS_FILE, 'utf-8');
+      return { ...defaultSettings, ...JSON.parse(data) };
+    }
+  } catch (err) {
+    console.error('Error reading settings file:', err);
+  }
+  return defaultSettings;
+}
+
+function saveSettings(settings: any) {
+  try {
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error writing settings file:', err);
+  }
+}
+
+app.get('/api/settings', (_req: Request, res: Response) => {
+  res.json(getSettings());
+});
+
+app.put('/api/settings', (req: Request, res: Response) => {
+  try {
+    const current = getSettings();
+    const updated = { ...current, ...req.body };
+    saveSettings(updated);
+    res.json(updated);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
   }
 });
 

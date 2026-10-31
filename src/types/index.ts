@@ -175,3 +175,16 @@ export interface DashboardStats {
   recentOrders: Order[];
   lowStockItems: Product[];
 }
+
+export interface SystemSettings {
+  companyName: string;
+  tagline: string;
+  phone: string;
+  email: string;
+  address: string;
+  registrationNumber: string;
+  invoiceFooterNote: string;
+  defaultCurrency: string;
+  defaultCreditLimit: number;
+  lowStockThreshold: number;
+}
