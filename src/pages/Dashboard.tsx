@@ -109,7 +109,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             Distribution Fleet Dashboard
           </h1>
           <p className="text-slate-500 text-xs sm:text-sm mt-1">
-            Real-time status of 3 delivery lorries, route sales, and warehouse stock flow.
+            Fleet operations, route sales & inventory overview.
           </p>
         </div>
 
@@ -139,17 +139,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* Date Range Filter Bar */}
-      <div className="bg-white/80 backdrop-blur-md p-4 rounded-3xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white/80 backdrop-blur-md p-3.5 sm:p-4 rounded-3xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3.5">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
             <Calendar className="w-4 h-4" />
           </div>
           <div>
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-              Timeframe Filter
-            </span>
             <span className="text-sm font-bold text-slate-900">
-              Showing {getPresetLabel()} Analytics & Sales
+              {getPresetLabel()} Overview
             </span>
           </div>
         </div>
@@ -168,7 +165,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <Truck className="w-4 h-4 text-blue-600" />
             3-Lorry Fleet Dispatch Status
           </span>
-          <span className="text-xs text-slate-400">Route 1, Route 2 & Route 3</span>
+          <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-md">
+            Active Routes
+          </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -239,104 +238,104 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Low Stock Urgent Banner */}
       {stats && stats.lowStockCount > 0 && (
-        <div className="bg-amber-50/90 border border-amber-200 rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-amber-100 rounded-2xl text-amber-800 shrink-0">
-              <AlertTriangle className="w-6 h-6 stroke-[2.2]" />
+        <div className="bg-amber-50/90 border border-amber-200 rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-center gap-3.5">
+            <div className="p-2.5 bg-amber-100 rounded-2xl text-amber-800 shrink-0">
+              <AlertTriangle className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
-              <p className="text-base font-semibold text-amber-950">
+              <p className="text-sm sm:text-base font-semibold text-amber-950">
                 {stats.lowStockCount} Products Below Minimum Stock Threshold in Warehouse
               </p>
-              <p className="text-xs text-amber-800 mt-0.5">
-                Items like {stats.lowStockItems.map(i => i.name).join(', ')} require inbound stock replenishment.
+              <p className="text-xs text-amber-800/80 mt-0.5">
+                {stats.lowStockItems.map(i => i.name).slice(0, 3).join(', ')}{stats.lowStockItems.length > 3 ? ` +${stats.lowStockItems.length - 3} more` : ''}
               </p>
             </div>
           </div>
           <button
             onClick={onNavigateToInventory}
-            className="px-4 py-2 bg-amber-900 hover:bg-black text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition self-start sm:self-auto shrink-0"
+            className="px-4 py-2 bg-amber-900 hover:bg-black text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition self-start sm:self-auto shrink-0 shadow-2xs"
           >
             Manage Warehouse Stock <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
 
-      {/* Financial Metric Cards with Active Timeframe Label */}
+      {/* Clean Minimal Financial Metric Cards */}
       {stats && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white border border-slate-200/70 p-6 rounded-3xl shadow-2xs hover:shadow-md transition">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+          <div className="bg-white border border-slate-200/80 p-5 rounded-3xl shadow-2xs hover:shadow-sm transition">
             <div className="flex items-center justify-between text-slate-400 mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 {getPresetLabel()} Sales
               </span>
-              <div className="p-2 bg-blue-50 rounded-xl">
-                <Coins className="w-5 h-5 text-blue-600" />
+              <div className="flex items-center gap-2">
+                {stats.ordersTodayCount > 0 && (
+                  <span className="text-[11px] font-bold px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md">
+                    {stats.ordersTodayCount} bills
+                  </span>
+                )}
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                  <Coins className="w-4.5 h-4.5" />
+                </div>
               </div>
             </div>
-            <div className="text-3xl font-bold tracking-tight text-slate-900 font-mono">
+            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 font-mono mt-1">
               {formatMoney(stats.revenueToday)}
             </div>
-            <p className="text-xs text-slate-400 mt-2 font-medium">From {stats.ordersTodayCount} bills recorded</p>
           </div>
 
-          <div className="bg-white border border-slate-200/70 p-6 rounded-3xl shadow-2xs hover:shadow-md transition">
+          <div className="bg-white border border-slate-200/80 p-5 rounded-3xl shadow-2xs hover:shadow-sm transition">
             <div className="flex items-center justify-between text-slate-400 mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 {getPresetLabel()} Cash Handover
               </span>
-              <div className="p-2 bg-emerald-50 rounded-xl">
-                <Wallet className="w-5 h-5 text-emerald-600" />
+              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                <Wallet className="w-4.5 h-4.5" />
               </div>
             </div>
-            <div className="text-3xl font-bold tracking-tight text-emerald-600 font-mono">
+            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-emerald-600 font-mono mt-1">
               {formatMoney(stats.cashToday)}
             </div>
-            <p className="text-xs text-slate-400 mt-2 font-medium">Cash collected from drivers</p>
           </div>
 
-          <div className="bg-white border border-slate-200/70 p-6 rounded-3xl shadow-2xs hover:shadow-md transition">
+          <div className="bg-white border border-slate-200/80 p-5 rounded-3xl shadow-2xs hover:shadow-sm transition">
             <div className="flex items-center justify-between text-slate-400 mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 {getPresetLabel()} Credit
               </span>
-              <div className="p-2 bg-amber-50 rounded-xl">
-                <TrendingUp className="w-5 h-5 text-amber-600" />
+              <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
+                <TrendingUp className="w-4.5 h-4.5" />
               </div>
             </div>
-            <div className="text-3xl font-bold tracking-tight text-slate-900 font-mono">
+            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 font-mono mt-1">
               {formatMoney(stats.creditToday)}
             </div>
-            <p className="text-xs text-slate-400 mt-2 font-medium">Credit given on paper bills</p>
           </div>
 
-          <div className="bg-white border border-slate-200/70 p-6 rounded-3xl shadow-2xs hover:shadow-md transition">
+          <div className="bg-white border border-slate-200/80 p-5 rounded-3xl shadow-2xs hover:shadow-sm transition">
             <div className="flex items-center justify-between text-slate-400 mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 Total Receivables
               </span>
-              <div className="p-2 bg-purple-50 rounded-xl">
-                <TrendingUp className="w-5 h-5 text-purple-600" />
+              <div className="p-2 bg-purple-50 text-purple-600 rounded-xl">
+                <TrendingUp className="w-4.5 h-4.5" />
               </div>
             </div>
-            <div className="text-3xl font-bold tracking-tight text-slate-900 font-mono">
+            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 font-mono mt-1">
               {formatMoney(stats.totalOutstanding)}
             </div>
-            <p className="text-xs text-slate-400 mt-2 font-medium">All retail client balances</p>
           </div>
         </div>
       )}
 
       {/* Orders Table */}
       {stats && (
-        <div className="bg-white border border-slate-200/70 rounded-3xl shadow-2xs overflow-hidden">
-          <div className="px-7 py-5 border-b border-slate-100 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">
-                {getPresetLabel()} Driver Sales Bills
-              </h2>
-              <p className="text-xs text-slate-400">Bills brought by drivers and saved in the system</p>
-            </div>
+        <div className="bg-white border border-slate-200/80 rounded-3xl shadow-2xs overflow-hidden">
+          <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between">
+            <h2 className="text-base font-bold text-slate-900">
+              {getPresetLabel()} Sales Bills
+            </h2>
             <button
               onClick={onNavigateToBillEntry}
               className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
