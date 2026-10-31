@@ -9,7 +9,9 @@ import {
   Lorry,
   LorryLoading,
   SystemSettings,
-  ProfitAndLossReport
+  ProfitAndLossReport,
+  Supplier,
+  PurchaseOrder
 } from '../types';
 
 // Dynamic API URL: uses relative '/api' on Railway / production web,
@@ -128,3 +130,34 @@ export const SettingsService = {
   update: (data: Partial<SystemSettings>) =>
     api.put<SystemSettings>('/settings', data).then(r => r.data)
 };
+
+export const SupplierService = {
+  getAll: (search?: string) =>
+    api.get<Supplier[]>('/suppliers', { params: { search } }).then(r => r.data),
+  getById: (id: string) =>
+    api.get<Supplier>(`/suppliers/${id}`).then(r => r.data),
+  create: (data: Partial<Supplier>) =>
+    api.post<Supplier>('/suppliers', data).then(r => r.data),
+  update: (id: string, data: Partial<Supplier>) =>
+    api.put<Supplier>(`/suppliers/${id}`, data).then(r => r.data),
+  delete: (id: string) =>
+    api.delete(`/suppliers/${id}`).then(r => r.data),
+  recordPayment: (id: string, payload: { amount: number; paymentMethod?: string; notes?: string }) =>
+    api.post<{ message: string; supplier: Supplier }>(`/suppliers/${id}/payments`, payload).then(r => r.data)
+};
+
+export const PurchaseOrderService = {
+  getAll: (params?: { supplierId?: string; from?: string; to?: string }) =>
+    api.get<PurchaseOrder[]>('/purchase-orders', { params }).then(r => r.data),
+  create: (payload: {
+    supplierId: string;
+    supplierInvoiceNumber?: string;
+    date?: string;
+    paymentStatus?: string;
+    paymentMethod?: string;
+    paidAmount?: number;
+    notes?: string;
+    items: { productId: string; quantity: number; costPrice: number }[];
+  }) => api.post<PurchaseOrder>('/purchase-orders', payload).then(r => r.data)
+};
+

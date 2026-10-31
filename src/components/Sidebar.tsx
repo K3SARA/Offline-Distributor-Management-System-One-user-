@@ -12,6 +12,7 @@ import {
   Coins,
   Settings as SettingsIcon,
   TrendingUp,
+  Building2,
   X
 } from 'lucide-react';
 import { useCurrency, CURRENCIES, CurrencyCode } from '../context/CurrencyContext';
@@ -34,6 +35,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'inventory', label: 'Warehouse Stock', icon: Boxes, badge: 'Step 1' },
+    { id: 'suppliers', label: 'Suppliers & Inward', icon: Building2, badge: 'Stock In' },
     { id: 'lorry-loading', label: 'Morning Lorry Load', icon: Truck, badge: 'Step 2' },
     { id: 'bill-entry', label: 'Office Bill Entry', icon: Receipt, badge: 'Step 3' },
     { id: 'lorry-settlement', label: 'Day Settlement', icon: RotateCcw, badge: 'Step 4' },

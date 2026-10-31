@@ -43,6 +43,7 @@ app.get('/api/products', async (req: Request, res: Response) => {
     const products = await prisma.product.findMany({
       where,
       include: {
+        supplier: true,
         lorryStocks: {
           include: { lorry: true }
         }
@@ -184,6 +185,329 @@ app.delete('/api/products/:id', async (req: Request, res: Response) => {
 
     await prisma.product.delete({ where: { id } });
     res.json({ message: 'Product deleted successfully.' });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// ========================================================
+// 1.5. SUPPLIERS & PROCUREMENT (WAREHOUSE INBOUND STOCK)
+// ========================================================
+
+// List all suppliers
+app.get('/api/suppliers', async (req: Request, res: Response) => {
+  try {
+    const { search } = req.query;
+    const where: any = {};
+    if (search && typeof search === 'string') {
+      where.OR = [
+        { name: { contains: search } },
+        { code: { contains: search } },
+        { contactPerson: { contains: search } },
+        { phone: { contains: search } }
+      ];
+    }
+
+    const suppliers = await prisma.supplier.findMany({
+      where,
+      include: {
+        _count: {
+          select: { products: true, purchaseOrders: true }
+        }
+      },
+      orderBy: { name: 'asc' }
+    });
+    res.json(suppliers);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get single supplier with products & past purchase orders
+app.get('/api/suppliers/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const supplier = await prisma.supplier.findUniqueOrThrow({
+      where: { id },
+      include: {
+        products: true,
+        purchaseOrders: {
+          include: {
+            items: { include: { product: true } }
+          },
+          orderBy: { date: 'desc' },
+          take: 25
+        }
+      }
+    });
+    res.json(supplier);
+  } catch (error: any) {
+    res.status(404).json({ error: 'Supplier not found.' });
+  }
+});
+
+// Create supplier
+app.post('/api/suppliers', async (req: Request, res: Response) => {
+  try {
+    const { code, name, contactPerson, phone, email, address, city, paymentTerms } = req.body;
+    if (!name || !phone) {
+      return res.status(400).json({ error: 'Supplier name and contact phone are required.' });
+    }
+
+    let supplierCode = code?.trim()?.toUpperCase();
+    if (!supplierCode) {
+      const count = await prisma.supplier.count();
+      supplierCode = `SUP-${String(count + 1).padStart(3, '0')}`;
+    }
+
+    const supplier = await prisma.supplier.create({
+      data: {
+        code: supplierCode,
+        name: name.trim(),
+        contactPerson: contactPerson?.trim() || null,
+        phone: phone.trim(),
+        email: email?.trim() || null,
+        address: address?.trim() || null,
+        city: city?.trim() || 'Colombo',
+        paymentTerms: paymentTerms?.trim() || 'NET 30',
+        outstandingBalance: 0.0
+      }
+    });
+
+    res.json(supplier);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Update supplier
+app.put('/api/suppliers/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, contactPerson, phone, email, address, city, paymentTerms } = req.body;
+
+    const updated = await prisma.supplier.update({
+      where: { id },
+      data: {
+        name: name?.trim(),
+        contactPerson: contactPerson?.trim() || null,
+        phone: phone?.trim(),
+        email: email?.trim() || null,
+        address: address?.trim() || null,
+        city: city?.trim(),
+        paymentTerms: paymentTerms?.trim()
+      }
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Record supplier payment (settles outstanding balance owed)
+app.post('/api/suppliers/:id/payments', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { amount, paymentMethod, notes } = req.body;
+    const payAmount = parseFloat(amount);
+
+    if (isNaN(payAmount) || payAmount <= 0) {
+      return res.status(400).json({ error: 'Valid positive payment amount required.' });
+    }
+
+    const supplier = await prisma.supplier.findUniqueOrThrow({ where: { id } });
+    const updated = await prisma.supplier.update({
+      where: { id },
+      data: {
+        outstandingBalance: { decrement: payAmount }
+      }
+    });
+
+    res.json({
+      message: `Payment of ${payAmount} recorded for ${supplier.name}.`,
+      supplier: updated
+    });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Delete supplier
+app.delete('/api/suppliers/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const poCount = await prisma.purchaseOrder.count({ where: { supplierId: id } });
+    if (poCount > 0) {
+      return res.status(400).json({ error: 'Cannot delete supplier with linked purchase orders.' });
+    }
+
+    await prisma.supplier.delete({ where: { id } });
+    res.json({ message: 'Supplier deleted successfully.' });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// List Inbound Goods Receipts / Purchase Orders
+app.get('/api/purchase-orders', async (req: Request, res: Response) => {
+  try {
+    const { supplierId, from, to } = req.query;
+    const where: any = {};
+
+    if (supplierId && typeof supplierId === 'string' && supplierId !== 'ALL') {
+      where.supplierId = supplierId;
+    }
+    if (from || to) {
+      where.date = {
+        gte: from ? new Date(from as string) : undefined,
+        lte: to ? new Date(to as string) : undefined
+      };
+    }
+
+    const orders = await prisma.purchaseOrder.findMany({
+      where,
+      include: {
+        supplier: true,
+        items: {
+          include: { product: true }
+        }
+      },
+      orderBy: { date: 'desc' }
+    });
+
+    res.json(orders);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create Inbound Goods Received Note (GRN) - DIRECTLY WIRED WITH WAREHOUSE STOCK
+app.post('/api/purchase-orders', async (req: Request, res: Response) => {
+  try {
+    const {
+      supplierId,
+      supplierInvoiceNumber,
+      date,
+      paymentStatus,
+      paymentMethod,
+      paidAmount,
+      notes,
+      items
+    } = req.body;
+
+    if (!supplierId || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Supplier and at least one received item are required.' });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const supplier = await tx.supplier.findUniqueOrThrow({ where: { id: supplierId } });
+
+      let subtotal = 0;
+      const validItems = [];
+
+      for (const item of items) {
+        const qty = parseInt(item.quantity, 10);
+        const cost = parseFloat(item.costPrice);
+
+        if (isNaN(qty) || qty <= 0) continue;
+        if (isNaN(cost) || cost < 0) continue;
+
+        const lineTotal = qty * cost;
+        subtotal += lineTotal;
+
+        validItems.push({
+          productId: item.productId,
+          quantity: qty,
+          costPrice: cost,
+          lineTotal
+        });
+      }
+
+      if (validItems.length === 0) {
+        throw new Error('Please specify valid product quantities and unit costs.');
+      }
+
+      const totalAmount = subtotal;
+      const actualPaid = parseFloat(paidAmount !== undefined ? paidAmount : (paymentStatus === 'PAID' ? totalAmount : 0)) || 0;
+      const actualPaymentStatus = paymentStatus || (actualPaid >= totalAmount ? 'PAID' : actualPaid > 0 ? 'PARTIAL' : 'UNPAID');
+
+      // Auto-generate PO / GRN number
+      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const countToday = await tx.purchaseOrder.count({
+        where: {
+          createdAt: {
+            gte: new Date(new Date().setHours(0, 0, 0, 0))
+          }
+        }
+      });
+      const orderNumber = `GRN-${dateStr}-${String(countToday + 1).padStart(4, '0')}`;
+
+      // 1. Create Purchase Order / GRN
+      const createdPO = await tx.purchaseOrder.create({
+        data: {
+          orderNumber,
+          supplierInvoiceNumber: supplierInvoiceNumber?.trim() || null,
+          supplierId,
+          status: 'RECEIVED',
+          paymentStatus: actualPaymentStatus,
+          paymentMethod: paymentMethod || 'BANK_TRANSFER',
+          date: date ? new Date(date) : new Date(),
+          subtotal,
+          taxAmount: 0.0,
+          totalAmount,
+          paidAmount: actualPaid,
+          notes: notes?.trim() || null,
+          receivedAt: new Date(),
+          items: {
+            create: validItems
+          }
+        },
+        include: {
+          supplier: true,
+          items: { include: { product: true } }
+        }
+      });
+
+      // 2. WIRE WITH WAREHOUSE STOCK FOR EACH ITEM:
+      for (const item of validItems) {
+        // Increment warehouse central inventory & update cost price
+        await tx.product.update({
+          where: { id: item.productId },
+          data: {
+            currentStock: { increment: item.quantity },
+            costPrice: item.costPrice,
+            supplierId: supplier.id
+          }
+        });
+
+        // Record Inbound Stock Movement
+        await tx.stockMovement.create({
+          data: {
+            productId: item.productId,
+            type: 'INBOUND',
+            quantity: item.quantity,
+            referenceId: createdPO.orderNumber,
+            notes: `Inbound GRN from ${supplier.name}${supplierInvoiceNumber ? ` (Inv #${supplierInvoiceNumber})` : ''}`
+          }
+        });
+      }
+
+      // 3. If unpaid balance, update supplier outstanding payable balance
+      const unpaidBalance = totalAmount - actualPaid;
+      if (unpaidBalance > 0) {
+        await tx.supplier.update({
+          where: { id: supplier.id },
+          data: {
+            outstandingBalance: { increment: unpaidBalance }
+          }
+        });
+      }
+
+      return createdPO;
+    });
+
+    res.json(result);
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
@@ -1985,6 +2309,65 @@ async function seedIfEmpty() {
           outstandingBalance: 0
         }
       });
+    }
+
+    // Ensure default Suppliers exist
+    const supplierCount = await prisma.supplier.count();
+    if (supplierCount === 0) {
+      console.log('[Auto-Seed] Seeding major wholesale FMCG suppliers...');
+      const sup1 = await prisma.supplier.create({
+        data: {
+          code: 'SUP-001',
+          name: 'Ceylon Tea Mills & Plantations (Pvt) Ltd',
+          contactPerson: 'Rohan De Silva',
+          phone: '+94 11 234 5678',
+          email: 'sales@ceylonteanational.com',
+          address: '45 Plantation Way, Nuwara Eliya',
+          city: 'Nuwara Eliya',
+          paymentTerms: 'NET 30',
+          outstandingBalance: 45000.0
+        }
+      });
+
+      const sup2 = await prisma.supplier.create({
+        data: {
+          code: 'SUP-002',
+          name: 'Lanka Pure Beverage Bottlers Ltd',
+          contactPerson: 'Kanishka Perera',
+          phone: '+94 11 987 6543',
+          email: 'orders@lankapure.lk',
+          address: '12 Industrial Zone, Biyagama',
+          city: 'Biyagama',
+          paymentTerms: 'NET 15',
+          outstandingBalance: 0.0
+        }
+      });
+
+      const sup3 = await prisma.supplier.create({
+        data: {
+          code: 'SUP-003',
+          name: 'Maha Oya Sugar & Grain Refineries',
+          contactPerson: 'Dinesh Wickramasinghe',
+          phone: '+94 25 222 3344',
+          email: 'distribution@mahaoyarefineries.com',
+          address: '88 Agri-Industrial Park, Anuradhapura',
+          city: 'Anuradhapura',
+          paymentTerms: 'NET 30',
+          outstandingBalance: 120000.0
+        }
+      });
+
+      // Link products to suppliers
+      const allProds = await prisma.product.findMany();
+      for (const prod of allProds) {
+        if (prod.sku.startsWith('BEV-001')) {
+          await prisma.product.update({ where: { id: prod.id }, data: { supplierId: sup1.id } });
+        } else if (prod.sku.startsWith('BEV-002')) {
+          await prisma.product.update({ where: { id: prod.id }, data: { supplierId: sup2.id } });
+        } else {
+          await prisma.product.update({ where: { id: prod.id }, data: { supplierId: sup3.id } });
+        }
+      }
     }
 
     console.log('[Auto-Seed] System initial data ready.');

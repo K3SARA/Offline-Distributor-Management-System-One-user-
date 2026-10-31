@@ -76,12 +76,66 @@ export interface Product {
   minStockAlert: number;
   freeRatioBuy?: number;
   freeRatioGet?: number;
+  supplierId?: string | null;
+  supplier?: Supplier | null;
   createdAt: string;
   updatedAt: string;
   lorryStocks?: {
     quantity: number;
     lorry: Lorry;
   }[];
+}
+
+export interface Supplier {
+  id: string;
+  code: string;
+  name: string;
+  contactPerson?: string | null;
+  phone: string;
+  email?: string | null;
+  address?: string | null;
+  city: string;
+  paymentTerms?: string | null;
+  outstandingBalance: number;
+  createdAt: string;
+  updatedAt: string;
+  products?: Product[];
+  purchaseOrders?: PurchaseOrder[];
+  _count?: {
+    products: number;
+    purchaseOrders: number;
+  };
+}
+
+export interface PurchaseOrderItem {
+  id: string;
+  purchaseOrderId: string;
+  productId: string;
+  product: Product;
+  quantity: number;
+  costPrice: number;
+  lineTotal: number;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  orderNumber: string;
+  supplierInvoiceNumber?: string | null;
+  supplierId: string;
+  supplier: Supplier;
+  status: 'DRAFT' | 'ORDERED' | 'RECEIVED' | 'CANCELLED';
+  paymentStatus: 'PAID' | 'PARTIAL' | 'UNPAID';
+  paymentMethod: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE';
+  date: string;
+  subtotal: number;
+  taxAmount: number;
+  totalAmount: number;
+  paidAmount: number;
+  notes?: string | null;
+  receivedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items: PurchaseOrderItem[];
 }
 
 export interface Customer {

@@ -18,6 +18,7 @@ import { LorrySettlement } from './pages/LorrySettlement';
 import { Customers } from './pages/Customers';
 import { Reports } from './pages/Reports';
 import { ProfitAndLoss } from './pages/ProfitAndLoss';
+import { Suppliers } from './pages/Suppliers';
 import { Settings } from './pages/Settings';
 import { InvoiceModal } from './components/InvoiceModal';
 import { CurrencyProvider, useCurrency, CURRENCIES } from './context/CurrencyContext';
@@ -97,7 +98,11 @@ export const AppContent: React.FC = () => {
             />
           )}
 
-          {currentTab === 'inventory' && <Inventory />}
+          {currentTab === 'inventory' && (
+            <Inventory onNavigateToSuppliers={() => setCurrentTab('suppliers')} />
+          )}
+
+          {currentTab === 'suppliers' && <Suppliers />}
 
           {currentTab === 'lorry-loading' && <LorryLoading />}
 

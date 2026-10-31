@@ -18,7 +18,11 @@ import { ProductModal } from '../components/ProductModal';
 import { StockAdjustModal } from '../components/StockAdjustModal';
 import { useCurrency } from '../context/CurrencyContext';
 
-export const Inventory: React.FC = () => {
+interface InventoryProps {
+  onNavigateToSuppliers?: () => void;
+}
+
+export const Inventory: React.FC<InventoryProps> = ({ onNavigateToSuppliers }) => {
   const { formatMoney } = useCurrency();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,7 +84,7 @@ export const Inventory: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-blue-600 mb-1">
             <Boxes className="w-4 h-4" />
-            <span>Step 1: Central Warehouse Bulk Inward</span>
+            <span>Step 1: Central Warehouse Stock</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1D1D1F]">
             Central Warehouse Stock
@@ -90,7 +94,16 @@ export const Inventory: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          {onNavigateToSuppliers && (
+            <button
+              onClick={onNavigateToSuppliers}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold rounded-2xl border border-emerald-200 transition text-xs"
+            >
+              <Package className="w-4 h-4 text-emerald-600" />
+              Receive Inbound GRN
+            </button>
+          )}
           <button
             onClick={openAddModal}
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 bg-[#0071E3] hover:bg-blue-600 active:scale-[0.98] text-white font-semibold rounded-2xl shadow-sm transition text-xs"

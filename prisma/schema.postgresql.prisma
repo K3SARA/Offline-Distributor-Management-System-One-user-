@@ -25,10 +25,14 @@ model Product {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
+  supplierId     String?
+  supplier       Supplier?       @relation(fields: [supplierId], references: [id])
+
   orderItems     OrderItem[]
   stockMovements StockMovement[]
   lorryStocks    LorryStock[]
   loadingItems   LorryLoadingItem[]
+  purchaseOrderItems PurchaseOrderItem[]
 
   @@index([sku])
   @@index([name])
@@ -224,3 +228,69 @@ model OrderItem {
   @@index([orderId])
   @@index([productId])
 }
+
+// --------------------------------------------------------
+// 5. SUPPLIERS & PROCUREMENT (GOODS RECEIVED NOTES - GRN)
+// --------------------------------------------------------
+model Supplier {
+  id                 String          @id @default(uuid())
+  code               String          @unique // e.g. "SUP-001"
+  name               String          // e.g. "Ceylon Tea Exporters (Pvt) Ltd"
+  contactPerson      String?         // e.g. "Rohan De Silva"
+  phone              String          // e.g. "+94 11 234 5678"
+  email              String?
+  address            String?
+  city               String          @default("Colombo")
+  paymentTerms       String?         @default("NET 30") // NET 15, NET 30, CASH ON DELIVERY
+  outstandingBalance Float           @default(0.0) // Balance owed to supplier
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  products           Product[]
+  purchaseOrders     PurchaseOrder[]
+
+  @@index([code])
+  @@index([name])
+}
+
+model PurchaseOrder {
+  id                    String              @id @default(uuid())
+  orderNumber           String              @unique // e.g. "PO-20261031-001" or "GRN-001"
+  supplierInvoiceNumber String?             // Physical bill / invoice number from the supplier
+  supplierId            String
+  supplier              Supplier            @relation(fields: [supplierId], references: [id])
+  status                String              @default("RECEIVED") // DRAFT, ORDERED, RECEIVED, CANCELLED
+  paymentStatus         String              @default("PAID") // PAID, PARTIAL, UNPAID
+  paymentMethod         String              @default("BANK_TRANSFER") // CASH, BANK_TRANSFER, CHEQUE
+  date                  DateTime            @default(now())
+  subtotal              Float
+  taxAmount             Float               @default(0.0)
+  totalAmount           Float
+  paidAmount            Float               @default(0.0)
+  notes                 String?
+  receivedAt            DateTime?           @default(now())
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  items                 PurchaseOrderItem[]
+
+  @@index([orderNumber])
+  @@index([supplierId])
+  @@index([createdAt])
+  @@index([status])
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(uuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product       @relation(fields: [productId], references: [id])
+  quantity        Int           // Units received into warehouse stock
+  costPrice       Float         // Purchase price per unit
+  lineTotal       Float         // quantity * costPrice
+
+  @@index([purchaseOrderId])
+  @@index([productId])
+}
+
