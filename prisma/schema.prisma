@@ -11,27 +11,27 @@ generator client {
 // 1. PRODUCTS & MAIN WAREHOUSE INVENTORY
 // --------------------------------------------------------
 model Product {
-  id             String          @id @default(uuid())
-  sku            String          @unique
-  name           String
-  category       String          @default("General")
-  unit           String          @default("Unit") // e.g., Case, Box, Pack, Kg
-  unitPrice      Float           // Base selling price
-  costPrice      Float           // Purchase cost price
-  currentStock   Int             @default(0)      // Warehouse main stock
-  minStockAlert  Int             @default(10)
-  freeRatioBuy   Int             @default(0)      // Buy X (e.g. 10)
-  freeRatioGet   Int             @default(0)      // Get Y Free (e.g. 1)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  id            String   @id @default(uuid())
+  sku           String   @unique
+  name          String
+  category      String   @default("General")
+  unit          String   @default("Unit") // e.g., Case, Box, Pack, Kg
+  unitPrice     Float // Base selling price
+  costPrice     Float // Purchase cost price
+  currentStock  Int      @default(0) // Warehouse main stock
+  minStockAlert Int      @default(10)
+  freeRatioBuy  Int      @default(0) // Buy X (e.g. 10)
+  freeRatioGet  Int      @default(0) // Get Y Free (e.g. 1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  supplierId     String?
-  supplier       Supplier?       @relation(fields: [supplierId], references: [id])
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id])
 
-  orderItems     OrderItem[]
-  stockMovements StockMovement[]
-  lorryStocks    LorryStock[]
-  loadingItems   LorryLoadingItem[]
+  orderItems         OrderItem[]
+  stockMovements     StockMovement[]
+  lorryStocks        LorryStock[]
+  loadingItems       LorryLoadingItem[]
   purchaseOrderItems PurchaseOrderItem[]
 }
 
@@ -39,9 +39,9 @@ model StockMovement {
   id          String   @id @default(uuid())
   productId   String
   product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  type        String   // INBOUND (Supplier), LORRY_LOAD (Out to lorry), LORRY_RETURN (Back to warehouse), ADJUSTMENT, RETURN
-  quantity    Int      // Movement amount
-  referenceId String?  // Linked Order ID, Loading ID, or Supplier Invoice #
+  type        String // INBOUND (Supplier), LORRY_LOAD (Out to lorry), LORRY_RETURN (Back to warehouse), ADJUSTMENT, RETURN
+  quantity    Int // Movement amount
+  referenceId String? // Linked Order ID, Loading ID, or Supplier Invoice #
   notes       String?
   createdAt   DateTime @default(now())
 }
@@ -50,32 +50,32 @@ model StockMovement {
 // 2. ROUTES & 3 LORRIES FLEET
 // --------------------------------------------------------
 model Route {
-  id          String     @id @default(uuid())
-  code        String     @unique // e.g., "R-01", "R-02", "R-03"
-  name        String     // e.g., "Route 1 - Colombo South"
+  id          String   @id @default(uuid())
+  code        String   @unique // e.g., "R-01", "R-02", "R-03"
+  name        String // e.g., "Route 1 - Colombo South"
   description String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  lorries     Lorry[]
-  customers   Customer[]
-  orders      Order[]
+  lorries   Lorry[]
+  customers Customer[]
+  orders    Order[]
 }
 
 model Lorry {
-  id            String         @id @default(uuid())
-  vehicleNumber String         @unique // e.g. "WP-DA-1024"
-  driverName    String         // e.g. "Sunil Perera"
+  id            String   @id @default(uuid())
+  vehicleNumber String   @unique // e.g. "WP-DA-1024"
+  driverName    String // e.g. "Sunil Perera"
   driverPhone   String?
   routeId       String?
-  route         Route?         @relation(fields: [routeId], references: [id])
-  status        String         @default("ACTIVE") // ACTIVE, MAINTENANCE
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  route         Route?   @relation(fields: [routeId], references: [id])
+  status        String   @default("ACTIVE") // ACTIVE, MAINTENANCE
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  loadings      LorryLoading[]
-  lorryStocks   LorryStock[]
-  orders        Order[]
+  loadings    LorryLoading[]
+  lorryStocks LorryStock[]
+  orders      Order[]
 }
 
 // Real-time floating inventory held on each lorry
@@ -93,26 +93,26 @@ model LorryStock {
 
 // Morning loading & Evening settlement ledger
 model LorryLoading {
-  id                 String             @id @default(uuid())
-  loadingNumber      String             @unique // e.g. "LOAD-20261030-001"
+  id                 String    @id @default(uuid())
+  loadingNumber      String    @unique // e.g. "LOAD-20261030-001"
   lorryId            String
-  lorry              Lorry              @relation(fields: [lorryId], references: [id])
+  lorry              Lorry     @relation(fields: [lorryId], references: [id])
   routeId            String?
-  date               DateTime           @default(now())
-  status             String             @default("LOADED") // LOADED, IN_TRANSIT, SETTLED
+  date               DateTime  @default(now())
+  status             String    @default("LOADED") // LOADED, IN_TRANSIT, SETTLED
   notes              String?
-  totalLoadedItems   Int                @default(0)
-  totalSoldItems     Int                @default(0)
-  totalFreeItems     Int                @default(0) // Promotional free units given
-  totalReturnedItems Int                @default(0)
-  totalSalesAmount   Float              @default(0.0)
-  cashCollected      Float              @default(0.0)
-  creditGiven        Float              @default(0.0)
+  totalLoadedItems   Int       @default(0)
+  totalSoldItems     Int       @default(0)
+  totalFreeItems     Int       @default(0) // Promotional free units given
+  totalReturnedItems Int       @default(0)
+  totalSalesAmount   Float     @default(0.0)
+  cashCollected      Float     @default(0.0)
+  creditGiven        Float     @default(0.0)
   settledAt          DateTime?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  items              LorryLoadingItem[]
+  items LorryLoadingItem[]
 }
 
 model LorryLoadingItem {
@@ -121,7 +121,7 @@ model LorryLoadingItem {
   loading        LorryLoading @relation(fields: [loadingId], references: [id], onDelete: Cascade)
   productId      String
   product        Product      @relation(fields: [productId], references: [id])
-  loadedQty      Int          // Morning loaded qty
+  loadedQty      Int // Morning loaded qty
   soldQty        Int          @default(0) // Sum of sales recorded via paper bills
   freeQty        Int          @default(0) // Free promotional units issued
   returnedQty    Int          @default(0) // Returned back to warehouse at settlement
@@ -148,49 +148,49 @@ model Customer {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  orders             Order[]
+  orders Order[]
 }
 
 // --------------------------------------------------------
 // 4. ORDERS & EVENING OFFICE BILL ENTRY
 // --------------------------------------------------------
 model Order {
-  id              String      @id @default(uuid())
-  orderNumber     String      @unique // e.g. "ORD-20261030-0001"
-  paperBillNumber String?     // Physical paper bill slip number brought by driver
+  id              String   @id @default(uuid())
+  orderNumber     String   @unique // e.g. "ORD-20261030-0001"
+  paperBillNumber String? // Physical paper bill slip number brought by driver
   customerId      String
-  customer        Customer    @relation(fields: [customerId], references: [id])
+  customer        Customer @relation(fields: [customerId], references: [id])
   lorryId         String?
-  lorry           Lorry?      @relation(fields: [lorryId], references: [id])
+  lorry           Lorry?   @relation(fields: [lorryId], references: [id])
   routeId         String?
-  route           Route?      @relation(fields: [routeId], references: [id])
-  status          String      @default("DELIVERED") // PENDING, DELIVERED, CANCELLED
-  paymentStatus   String      @default("PAID") // UNPAID, PARTIAL, PAID
-  paymentMethod   String      @default("CASH") // CASH, CREDIT, CHEQUE
-  
-  subtotal        Float
-  discountAmount  Float       @default(0.0)
-  taxAmount       Float       @default(0.0)
-  netTotal        Float
-  cashReceived    Float       @default(0.0)
+  route           Route?   @relation(fields: [routeId], references: [id])
+  status          String   @default("DELIVERED") // PENDING, DELIVERED, CANCELLED
+  paymentStatus   String   @default("PAID") // UNPAID, PARTIAL, PAID
+  paymentMethod   String   @default("CASH") // CASH, CREDIT, CHEQUE
 
-  notes           String?
-  dispatchedAt    DateTime?
-  deliveredAt     DateTime?   @default(now())
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  subtotal       Float
+  discountAmount Float @default(0.0)
+  taxAmount      Float @default(0.0)
+  netTotal       Float
+  cashReceived   Float @default(0.0)
 
-  items           OrderItem[]
+  notes        String?
+  dispatchedAt DateTime?
+  deliveredAt  DateTime? @default(now())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  items OrderItem[]
 }
 
 model OrderItem {
-  id           String   @id @default(uuid())
+  id           String  @id @default(uuid())
   orderId      String
-  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId    String
-  product      Product  @relation(fields: [productId], references: [id])
-  quantity     Int      // Billed / Paid quantity
-  freeQuantity Int      @default(0) // Free issues given on promotion
+  product      Product @relation(fields: [productId], references: [id])
+  quantity     Int // Billed / Paid quantity
+  freeQuantity Int     @default(0) // Free issues given on promotion
   unitPrice    Float
   lineTotal    Float
 }
@@ -199,43 +199,43 @@ model OrderItem {
 // 5. SUPPLIERS & PROCUREMENT (GOODS RECEIVED NOTES - GRN)
 // --------------------------------------------------------
 model Supplier {
-  id                 String          @id @default(uuid())
-  code               String          @unique // e.g. "SUP-001"
-  name               String          // e.g. "Ceylon Tea Exporters (Pvt) Ltd"
-  contactPerson      String?         // e.g. "Rohan De Silva"
-  phone              String          // e.g. "+94 11 234 5678"
+  id                 String   @id @default(uuid())
+  code               String   @unique // e.g. "SUP-001"
+  name               String // e.g. "Ceylon Tea Exporters (Pvt) Ltd"
+  contactPerson      String? // e.g. "Rohan De Silva"
+  phone              String // e.g. "+94 11 234 5678"
   email              String?
   address            String?
-  city               String          @default("Colombo")
-  paymentTerms       String?         @default("NET 30") // NET 15, NET 30, CASH ON DELIVERY
-  outstandingBalance Float           @default(0.0) // Balance owed to supplier
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  city               String   @default("Colombo")
+  paymentTerms       String?  @default("NET 30") // NET 15, NET 30, CASH ON DELIVERY
+  outstandingBalance Float    @default(0.0) // Balance owed to supplier
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  products           Product[]
-  purchaseOrders     PurchaseOrder[]
+  products       Product[]
+  purchaseOrders PurchaseOrder[]
 }
 
 model PurchaseOrder {
-  id                    String              @id @default(uuid())
-  orderNumber           String              @unique // e.g. "PO-20261031-001" or "GRN-001"
-  supplierInvoiceNumber String?             // Physical bill / invoice number from the supplier
+  id                    String    @id @default(uuid())
+  orderNumber           String    @unique // e.g. "PO-20261031-001" or "GRN-001"
+  supplierInvoiceNumber String? // Physical bill / invoice number from the supplier
   supplierId            String
-  supplier              Supplier            @relation(fields: [supplierId], references: [id])
-  status                String              @default("RECEIVED") // DRAFT, ORDERED, RECEIVED, CANCELLED
-  paymentStatus         String              @default("PAID") // PAID, PARTIAL, UNPAID
-  paymentMethod         String              @default("BANK_TRANSFER") // CASH, BANK_TRANSFER, CHEQUE
-  date                  DateTime            @default(now())
+  supplier              Supplier  @relation(fields: [supplierId], references: [id])
+  status                String    @default("RECEIVED") // DRAFT, ORDERED, RECEIVED, CANCELLED
+  paymentStatus         String    @default("PAID") // PAID, PARTIAL, UNPAID
+  paymentMethod         String    @default("BANK_TRANSFER") // CASH, BANK_TRANSFER, CHEQUE
+  date                  DateTime  @default(now())
   subtotal              Float
-  taxAmount             Float               @default(0.0)
+  taxAmount             Float     @default(0.0)
   totalAmount           Float
-  paidAmount            Float               @default(0.0)
+  paidAmount            Float     @default(0.0)
   notes                 String?
-  receivedAt            DateTime?           @default(now())
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
+  receivedAt            DateTime? @default(now())
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
-  items                 PurchaseOrderItem[]
+  items PurchaseOrderItem[]
 }
 
 model PurchaseOrderItem {
@@ -244,8 +244,7 @@ model PurchaseOrderItem {
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   productId       String
   product         Product       @relation(fields: [productId], references: [id])
-  quantity        Int           // Units received into warehouse stock
-  costPrice       Float         // Purchase price per unit
-  lineTotal       Float         // quantity * costPrice
+  quantity        Int // Units received into warehouse stock
+  costPrice       Float // Purchase price per unit
+  lineTotal       Float // quantity * costPrice
 }
-
