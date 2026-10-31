@@ -1138,7 +1138,7 @@ app.get('/api/customers', async (req: Request, res: Response) => {
       where,
       include: {
         route: true,
-        _count: { select: { orders: true } }
+        _count: { select: { orders: true, payments: true } }
       },
       orderBy: { name: 'asc' }
     });
@@ -1227,6 +1227,133 @@ app.get('/api/customers/:id/orders', async (req: Request, res: Response) => {
     res.json(orders);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Record customer payment (settles credit balance owed)
+app.post('/api/customers/:id/payments', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const {
+      amount,
+      paymentMethod,
+      chequeNumber,
+      bankName,
+      chequeDate,
+      reference,
+      notes,
+      collectedBy,
+      lorryId
+    } = req.body;
+
+    const payAmount = parseFloat(amount);
+    if (isNaN(payAmount) || payAmount <= 0) {
+      return res.status(400).json({ error: 'Valid positive payment amount required.' });
+    }
+
+    const customer = await prisma.customer.findUniqueOrThrow({
+      where: { id },
+      include: { route: true }
+    });
+
+    // Generate unique receipt number: RCPT-YYYYMMDD-XXXX
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+    const startOfToday = new Date(today);
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date(today);
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const countToday = await prisma.customerPayment.count({
+      where: {
+        createdAt: {
+          gte: startOfToday,
+          lte: endOfToday
+        }
+      }
+    });
+    const receiptNumber = `RCPT-${dateStr}-${(countToday + 1).toString().padStart(4, '0')}`;
+
+    // Execute in transaction: create payment receipt & decrement customer balance
+    const [payment, updatedCustomer] = await prisma.$transaction([
+      prisma.customerPayment.create({
+        data: {
+          receiptNumber,
+          customerId: id,
+          amount: payAmount,
+          paymentMethod: paymentMethod || 'CASH',
+          chequeNumber: chequeNumber?.trim() || null,
+          bankName: bankName?.trim() || null,
+          chequeDate: chequeDate ? new Date(chequeDate) : null,
+          reference: reference?.trim() || null,
+          notes: notes?.trim() || null,
+          collectedBy: collectedBy?.trim() || null,
+          lorryId: lorryId || null
+        },
+        include: {
+          customer: true,
+          lorry: true
+        }
+      }),
+      prisma.customer.update({
+        where: { id },
+        data: {
+          outstandingBalance: { decrement: payAmount }
+        },
+        include: { route: true }
+      })
+    ]);
+
+    res.status(201).json({
+      message: `Payment of ${payAmount} recorded for ${customer.name}. Receipt: ${receiptNumber}.`,
+      payment,
+      customer: updatedCustomer
+    });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// List customer payment receipts
+app.get('/api/customers/:id/payments', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const payments = await prisma.customerPayment.findMany({
+      where: { customerId: id },
+      include: { lorry: true },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(payments);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Void / Delete customer payment (restores credit balance)
+app.delete('/api/customer-payments/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const payment = await prisma.customerPayment.findUniqueOrThrow({
+      where: { id }
+    });
+
+    await prisma.$transaction([
+      prisma.customer.update({
+        where: { id: payment.customerId },
+        data: {
+          outstandingBalance: { increment: payment.amount }
+        }
+      }),
+      prisma.customerPayment.delete({
+        where: { id }
+      })
+    ]);
+
+    res.json({
+      message: `Payment receipt ${payment.receiptNumber} voided. Customer balance restored by ${payment.amount}.`
+    });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
   }
 });
 
@@ -1538,7 +1665,7 @@ app.get('/api/reports/dashboard-stats', async (req: Request, res: Response) => {
     const startDate = from ? new Date(from as string) : new Date(new Date().setHours(0, 0, 0, 0));
     const endDate = to ? new Date(to as string) : new Date(new Date().setHours(23, 59, 59, 999));
 
-    const [periodOrders, allProducts, customerBalances, lorries, periodExpenses] = await Promise.all([
+    const [periodOrders, allProducts, customerBalances, lorries, periodExpenses, customerPaymentsPeriod] = await Promise.all([
       prisma.order.findMany({
         where: {
           createdAt: {
@@ -1577,6 +1704,14 @@ app.get('/api/reports/dashboard-stats', async (req: Request, res: Response) => {
             lte: endDate
           }
         }
+      }),
+      prisma.customerPayment.findMany({
+        where: {
+          createdAt: {
+            gte: startDate,
+            lte: endDate
+          }
+        }
       })
     ]);
 
@@ -1587,6 +1722,7 @@ app.get('/api/reports/dashboard-stats', async (req: Request, res: Response) => {
     const creditToday = revenueToday - cashToday;
     const expensesToday = periodExpenses.reduce((acc, exp) => acc + exp.amount, 0);
     const netProfitToday = revenueToday - expensesToday;
+    const creditCollectionsToday = (customerPaymentsPeriod || []).reduce((acc: number, p: any) => acc + p.amount, 0);
 
     // Lorry fleet status breakdown
     const fleetStatus = lorries.map(l => {
@@ -1614,6 +1750,7 @@ app.get('/api/reports/dashboard-stats', async (req: Request, res: Response) => {
       creditToday,
       expensesToday,
       netProfitToday,
+      creditCollectionsToday,
       ordersTodayCount: validOrders.length,
       lowStockCount: lowStockProducts.length,
       totalOutstanding: customerBalances._sum.outstandingBalance || 0,

@@ -73,10 +73,11 @@ model Lorry {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  loadings    LorryLoading[]
-  lorryStocks LorryStock[]
-  orders      Order[]
-  expenses    Expense[]
+  loadings         LorryLoading[]
+  lorryStocks      LorryStock[]
+  orders           Order[]
+  expenses         Expense[]
+  customerPayments CustomerPayment[]
 }
 
 // Real-time floating inventory held on each lorry
@@ -150,7 +151,8 @@ model Customer {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  orders Order[]
+  orders   Order[]
+  payments CustomerPayment[]
 }
 
 // --------------------------------------------------------
@@ -271,4 +273,26 @@ model Expense {
   loading         LorryLoading? @relation(fields: [loadingId], references: [id], onDelete: SetNull)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+}
+
+// --------------------------------------------------------
+// 7. CUSTOMER CREDIT PAYMENTS & SETTLEMENT RECEIPTS
+// --------------------------------------------------------
+model CustomerPayment {
+  id            String    @id @default(uuid())
+  receiptNumber String    @unique // e.g. "RCPT-20261031-0001"
+  customerId    String
+  customer      Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  amount        Float
+  paymentMethod String    @default("CASH") // CASH, CHEQUE, BANK_TRANSFER
+  chequeNumber  String?
+  bankName      String?
+  chequeDate    DateTime?
+  reference     String?   // e.g. Bank slip or transaction ID
+  notes         String?
+  collectedBy   String?   // Driver name, Sales rep, or Cashier
+  lorryId       String?
+  lorry         Lorry?    @relation(fields: [lorryId], references: [id], onDelete: SetNull)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }

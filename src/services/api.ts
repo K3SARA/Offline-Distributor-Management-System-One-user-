@@ -13,7 +13,8 @@ import {
   Supplier,
   PurchaseOrder,
   Expense,
-  ExpenseSummary
+  ExpenseSummary,
+  CustomerPayment
 } from '../types';
 
 // Dynamic API URL: uses relative '/api' on Railway / production web,
@@ -85,7 +86,22 @@ export const CustomerService = {
   update: (id: string, data: Partial<Customer>) =>
     api.put<Customer>(`/customers/${id}`, data).then(r => r.data),
   getOrderHistory: (id: string) =>
-    api.get<Order[]>(`/customers/${id}/orders`).then(r => r.data)
+    api.get<Order[]>(`/customers/${id}/orders`).then(r => r.data),
+  recordPayment: (id: string, payload: {
+    amount: number;
+    paymentMethod?: 'CASH' | 'CHEQUE' | 'BANK_TRANSFER';
+    chequeNumber?: string;
+    bankName?: string;
+    chequeDate?: string;
+    reference?: string;
+    notes?: string;
+    collectedBy?: string;
+    lorryId?: string;
+  }) => api.post<{ message: string; payment: CustomerPayment; customer: Customer }>(`/customers/${id}/payments`, payload).then(r => r.data),
+  getPayments: (id: string) =>
+    api.get<CustomerPayment[]>(`/customers/${id}/payments`).then(r => r.data),
+  deletePayment: (paymentId: string) =>
+    api.delete<{ message: string }>(`/customer-payments/${paymentId}`).then(r => r.data)
 };
 
 export const OrderService = {

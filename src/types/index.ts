@@ -155,9 +155,30 @@ export interface Customer {
   outstandingBalance: number;
   createdAt: string;
   updatedAt: string;
+  payments?: CustomerPayment[];
   _count?: {
     orders: number;
+    payments?: number;
   };
+}
+
+export interface CustomerPayment {
+  id: string;
+  receiptNumber: string;
+  customerId: string;
+  customer?: Customer;
+  amount: number;
+  paymentMethod: 'CASH' | 'CHEQUE' | 'BANK_TRANSFER';
+  chequeNumber?: string | null;
+  bankName?: string | null;
+  chequeDate?: string | null;
+  reference?: string | null;
+  notes?: string | null;
+  collectedBy?: string | null;
+  lorryId?: string | null;
+  lorry?: Lorry | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface OrderItem {
@@ -229,6 +250,7 @@ export interface DashboardStats {
   totalOutstanding: number;
   expensesToday: number;
   netProfitToday: number;
+  creditCollectionsToday?: number;
   fleetStatus: FleetLorryStatus[];
   recentOrders: Order[];
   lowStockItems: Product[];
