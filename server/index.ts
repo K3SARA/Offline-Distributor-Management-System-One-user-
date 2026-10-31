@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import cors from 'cors';
 import * as path from 'path';
 import * as fs from 'fs';
-import { prisma } from './prisma';
+import { prisma, type PrismaClient } from './prisma';
 
 const app = express();
 const PORT = process.env.PORT || 4812;
