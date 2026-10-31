@@ -1818,22 +1818,50 @@ app.get('/api/reports/route-sales', async (req: Request, res: Response) => {
       };
     }
 
-    const routes = await prisma.route.findMany({
-      include: {
-        lorries: true,
-        customers: true,
-        orders: {
-          where: orderWhere,
-          include: { items: true }
+    const [routes, allOrders] = await Promise.all([
+      prisma.route.findMany({
+        include: {
+          lorries: true,
+          customers: true,
+          orders: {
+            where: orderWhere,
+            include: { items: true }
+          }
+        },
+        orderBy: { code: 'asc' }
+      }),
+      prisma.order.findMany({
+        where: orderWhere,
+        select: {
+          id: true,
+          routeId: true,
+          lorryId: true,
+          customerId: true,
+          netTotal: true,
+          cashReceived: true,
+          paymentMethod: true,
+          paymentStatus: true
         }
-      }
-    });
+      })
+    ]);
 
     const routeSummaries = routes.map(r => {
-      const totalSales = r.orders.reduce((acc, o) => acc + o.netTotal, 0);
-      const totalCash = r.orders.reduce((acc, o) => acc + o.cashReceived, 0);
-      const totalCredit = totalSales - totalCash;
-      const totalBills = r.orders.length;
+      const lorryIds = new Set(r.lorries.map(l => l.id));
+      const customerIds = new Set(r.customers.map(c => c.id));
+
+      // Match orders for this route: directly by routeId, or by assigned lorry or assigned customer
+      const routeOrders = allOrders.filter(o => 
+        o.routeId === r.id || 
+        (o.lorryId && lorryIds.has(o.lorryId)) || 
+        (o.customerId && customerIds.has(o.customerId))
+      );
+
+      const totalSales = routeOrders.reduce((acc, o) => acc + (o.netTotal || 0), 0);
+      const totalCash = routeOrders.reduce((acc, o) => acc + (o.cashReceived || 0), 0);
+      const totalCredit = routeOrders.reduce((acc, o) => acc + Math.max(0, (o.netTotal || 0) - (o.cashReceived || 0)), 0);
+      const totalBills = routeOrders.length;
+      const cashBillsCount = routeOrders.filter(o => (o.cashReceived || 0) >= (o.netTotal || 0)).length;
+      const creditBillsCount = routeOrders.filter(o => (o.cashReceived || 0) < (o.netTotal || 0)).length;
 
       return {
         id: r.id,
@@ -1843,6 +1871,8 @@ app.get('/api/reports/route-sales', async (req: Request, res: Response) => {
         lorry: r.lorries[0] || null,
         customerCount: r.customers.length,
         totalBills,
+        cashBillsCount,
+        creditBillsCount,
         totalSales,
         totalCash,
         totalCredit

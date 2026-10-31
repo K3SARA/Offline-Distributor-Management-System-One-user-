@@ -228,7 +228,7 @@ export const Reports: React.FC = () => {
             <div>
               <h2 className="text-lg sm:text-xl font-bold text-slate-900">
                 {activeTab === 'LORRIES' && 'Lorry Morning Load & Evening Settlement Audit'}
-                {activeTab === 'ROUTES' && '3 Routes Distribution Performance Analysis'}
+                {activeTab === 'ROUTES' && `${routeSummaries.length || 3} Routes Distribution Performance Analysis`}
                 {activeTab === 'SALES' && 'Daily Driver Sales Bills Log'}
                 {activeTab === 'STOCK' && 'Central Warehouse Stock Movements (Inbounds, Loads, Returns)'}
                 {activeTab === 'BALANCES' && 'Route Retail Customer Credit Statements'}
@@ -315,36 +315,212 @@ export const Reports: React.FC = () => {
         )}
 
         {/* 2. ROUTES REPORT */}
-        {activeTab === 'ROUTES' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {routeSummaries.map((route) => (
-                <div key={route.id} className="p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs font-bold text-blue-600">{route.code}</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 bg-white border border-slate-200 rounded-md">
-                      {route.customerCount} Outlets
-                    </span>
-                  </div>
-                  <h3 className="text-sm font-bold text-slate-900">{route.name}</h3>
-                  <div className="text-xs text-slate-500">
-                    Lorry: <strong className="text-slate-800">{route.lorry?.vehicleNumber || 'Unassigned'}</strong> ({route.lorry?.driverName || ''})
-                  </div>
-                  <div className="pt-2 border-t border-slate-200/70 grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <span className="text-[10px] text-slate-400 block uppercase font-bold">Period Sales</span>
-                      <span className="font-mono font-bold text-slate-900">{formatMoney(route.totalSales)}</span>
+        {activeTab === 'ROUTES' && (() => {
+          const totalSalesAll = routeSummaries.reduce((sum, r) => sum + (r.totalSales || 0), 0);
+          const totalCashAll = routeSummaries.reduce((sum, r) => sum + (r.totalCash || 0), 0);
+          const totalCreditAll = routeSummaries.reduce((sum, r) => sum + (r.totalCredit || 0), 0);
+          const totalBillsAll = routeSummaries.reduce((sum, r) => sum + (r.totalBills || 0), 0);
+
+          return (
+            <div className="space-y-6">
+              {/* Route Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {routeSummaries.map((route) => {
+                  const cashRatio = route.totalSales > 0 ? (route.totalCash / route.totalSales) * 100 : 0;
+                  const creditRatio = route.totalSales > 0 ? (route.totalCredit / route.totalSales) * 100 : 0;
+
+                  return (
+                    <div key={route.id} className="p-5 bg-slate-50/70 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3.5 hover:border-slate-300 transition">
+                      {/* Top Header */}
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-xs font-bold text-blue-600 bg-white px-2 py-0.5 rounded-lg border border-slate-200/80 shadow-3xs">
+                          {route.code}
+                        </span>
+                        <span className="text-[10px] font-semibold text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-md">
+                          {route.customerCount} Outlets
+                        </span>
+                      </div>
+
+                      {/* Route Name & Lorry */}
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900">{route.name}</h3>
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          Lorry: <strong className="text-slate-800">{route.lorry?.vehicleNumber || 'Unassigned'}</strong> {route.lorry?.driverName ? `(${route.lorry.driverName})` : ''}
+                        </div>
+                      </div>
+
+                      {/* Total Period Sales Header */}
+                      <div className="pt-2 border-t border-slate-200/70 flex items-baseline justify-between">
+                        <div>
+                          <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">
+                            Period Sales
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            {route.totalBills} {route.totalBills === 1 ? 'bill' : 'bills'}
+                          </span>
+                        </div>
+                        <span className="font-mono font-bold text-slate-900 text-base">
+                          {formatMoney(route.totalSales)}
+                        </span>
+                      </div>
+
+                      {/* Separate Cash and Credit Sections */}
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        {/* Cash Collected Box */}
+                        <div className="p-2.5 bg-emerald-50/70 border border-emerald-200/60 rounded-xl space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                              Cash
+                            </span>
+                            <span className="text-[10px] font-mono font-bold text-emerald-700">
+                              {Math.round(cashRatio)}%
+                            </span>
+                          </div>
+                          <div className="font-mono font-bold text-emerald-700 text-sm">
+                            {formatMoney(route.totalCash)}
+                          </div>
+                          <span className="text-[9px] text-emerald-600/80 block font-medium">
+                            Collected cash
+                          </span>
+                        </div>
+
+                        {/* Credit Given Box */}
+                        <div className="p-2.5 bg-amber-50/70 border border-amber-200/60 rounded-xl space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-amber-800 font-bold uppercase tracking-wider flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                              Credit
+                            </span>
+                            <span className="text-[10px] font-mono font-bold text-amber-700">
+                              {Math.round(creditRatio)}%
+                            </span>
+                          </div>
+                          <div className="font-mono font-bold text-amber-700 text-sm">
+                            {formatMoney(route.totalCredit)}
+                          </div>
+                          <span className="text-[9px] text-amber-600/80 block font-medium">
+                            Pending credit
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Visual Cash vs Credit Ratio Bar */}
+                      <div className="space-y-1 pt-0.5">
+                        <div className="h-1.5 w-full bg-slate-200/70 rounded-full overflow-hidden flex">
+                          <div
+                            style={{ width: `${cashRatio}%` }}
+                            className="h-full bg-emerald-500 transition-all duration-300"
+                            title={`Cash: ${Math.round(cashRatio)}%`}
+                          />
+                          <div
+                            style={{ width: `${creditRatio}%` }}
+                            className="h-full bg-amber-400 transition-all duration-300"
+                            title={`Credit: ${Math.round(creditRatio)}%`}
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 block uppercase font-bold">Cash / Credit</span>
-                      <span className="font-mono font-bold text-emerald-600">{formatMoney(route.totalCash)}</span>
-                    </div>
-                  </div>
+                  );
+                })}
+              </div>
+
+              {/* Route Breakdown & Settlement Audit Table */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs">
+                <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Route-Wise Cash & Credit Settlement Audit
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-semibold bg-white border border-slate-200 px-2 py-0.5 rounded-md">
+                    {getPresetLabel()}
+                  </span>
                 </div>
-              ))}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50/80 border-b border-slate-100 text-[11px] font-bold uppercase text-slate-400 tracking-wider">
+                      <tr>
+                        <th className="py-3 px-4">Route</th>
+                        <th className="py-3 px-4">Lorry / Driver</th>
+                        <th className="py-3 px-3 text-center">Outlets</th>
+                        <th className="py-3 px-3 text-center">Bills</th>
+                        <th className="py-3 px-4 text-right">Total Net Sales</th>
+                        <th className="py-3 px-4 text-right text-emerald-700">Cash Collected</th>
+                        <th className="py-3 px-4 text-right text-amber-700">Credit Given</th>
+                        <th className="py-3 px-4 text-center">Collection Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                      {routeSummaries.map((route) => {
+                        const cashRatio = route.totalSales > 0 ? (route.totalCash / route.totalSales) * 100 : 0;
+                        return (
+                          <tr key={route.id} className="hover:bg-slate-50/60 transition">
+                            <td className="py-3 px-4">
+                              <span className="font-mono font-bold text-blue-600 block">{route.code}</span>
+                              <span className="font-semibold text-slate-900">{route.name}</span>
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className="font-bold text-slate-800 block">{route.lorry?.vehicleNumber || 'Unassigned'}</span>
+                              <span className="text-[11px] text-slate-400">{route.lorry?.driverName || 'No driver assigned'}</span>
+                            </td>
+                            <td className="py-3 px-3 text-center font-mono">{route.customerCount}</td>
+                            <td className="py-3 px-3 text-center font-mono font-bold text-slate-800">{route.totalBills}</td>
+                            <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
+                              {formatMoney(route.totalSales)}
+                            </td>
+                            <td className="py-3 px-4 text-right font-mono font-bold text-emerald-600 bg-emerald-50/20">
+                              {formatMoney(route.totalCash)}
+                            </td>
+                            <td className="py-3 px-4 text-right font-mono font-bold text-amber-600 bg-amber-50/20">
+                              {formatMoney(route.totalCredit)}
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                cashRatio >= 99
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                                  : cashRatio >= 50
+                                  ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                                  : 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                              }`}>
+                                {Math.round(cashRatio)}% Cash
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot className="bg-slate-50/90 border-t-2 border-slate-200 font-bold text-xs text-slate-900">
+                      <tr>
+                        <td colSpan={2} className="py-3.5 px-4 uppercase tracking-wider text-slate-600 font-extrabold text-[11px]">
+                          All Routes Total
+                        </td>
+                        <td className="py-3.5 px-3 text-center font-mono text-slate-600">
+                          {routeSummaries.reduce((sum, r) => sum + (r.customerCount || 0), 0)}
+                        </td>
+                        <td className="py-3.5 px-3 text-center font-mono text-slate-900">
+                          {totalBillsAll}
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-mono text-slate-900">
+                          {formatMoney(totalSalesAll)}
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-mono text-emerald-700 bg-emerald-100/40">
+                          {formatMoney(totalCashAll)}
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-mono text-amber-700 bg-amber-100/40">
+                          {formatMoney(totalCreditAll)}
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          <span className="font-mono text-xs font-bold text-slate-700">
+                            {totalSalesAll > 0 ? Math.round((totalCashAll / totalSalesAll) * 100) : 0}% Overall Cash
+                          </span>
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* 3. SALES REPORT */}
         {activeTab === 'SALES' && salesData && (
