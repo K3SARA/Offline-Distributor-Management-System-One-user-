@@ -89,7 +89,7 @@ export const AppContent: React.FC = () => {
 
         {/* Dynamic Page Views with bottom padding for mobile bar */}
         <div className="flex-1 overflow-y-auto pb-16 md:pb-0">
-          {currentTab === 'dashboard' && (
+          <div className={currentTab === 'dashboard' ? '' : 'hidden'}>
             <Dashboard
               onNavigateToLoading={() => setCurrentTab('lorry-loading')}
               onNavigateToBillEntry={() => setCurrentTab('bill-entry')}
@@ -98,33 +98,47 @@ export const AppContent: React.FC = () => {
               onNavigateToExpenses={() => setCurrentTab('expenses')}
               onViewInvoice={(order) => setActiveInvoiceOrder(order)}
             />
-          )}
+          </div>
 
-          {currentTab === 'inventory' && (
+          <div className={currentTab === 'inventory' ? '' : 'hidden'}>
             <Inventory onNavigateToSuppliers={() => setCurrentTab('suppliers')} />
-          )}
+          </div>
 
-          {currentTab === 'suppliers' && <Suppliers />}
+          <div className={currentTab === 'suppliers' ? '' : 'hidden'}>
+            <Suppliers />
+          </div>
 
-          {currentTab === 'lorry-loading' && <LorryLoading />}
+          <div className={currentTab === 'lorry-loading' ? '' : 'hidden'}>
+            <LorryLoading />
+          </div>
 
-          {currentTab === 'bill-entry' && (
+          <div className={currentTab === 'bill-entry' ? '' : 'hidden'}>
             <BillEntry onViewInvoice={(order) => setActiveInvoiceOrder(order)} />
-          )}
+          </div>
 
-          {currentTab === 'lorry-settlement' && <LorrySettlement />}
+          <div className={currentTab === 'lorry-settlement' ? '' : 'hidden'}>
+            <LorrySettlement />
+          </div>
 
-          {currentTab === 'customers' && (
+          <div className={currentTab === 'customers' ? '' : 'hidden'}>
             <Customers onViewInvoice={(order) => setActiveInvoiceOrder(order)} />
-          )}
+          </div>
 
-          {currentTab === 'reports' && <Reports />}
+          <div className={currentTab === 'reports' ? '' : 'hidden'}>
+            <Reports />
+          </div>
 
-          {currentTab === 'expenses' && <Expenses />}
+          <div className={currentTab === 'expenses' ? '' : 'hidden'}>
+            <Expenses />
+          </div>
 
-          {currentTab === 'pnl' && <ProfitAndLoss />}
+          <div className={currentTab === 'pnl' ? '' : 'hidden'}>
+            <ProfitAndLoss />
+          </div>
 
-          {currentTab === 'settings' && <Settings />}
+          <div className={currentTab === 'settings' ? '' : 'hidden'}>
+            <Settings />
+          </div>
         </div>
 
         {/* Mobile Bottom Navigation Bar (md:hidden) */}

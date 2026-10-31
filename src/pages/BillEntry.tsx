@@ -17,7 +17,8 @@ import {
   Store,
   ShoppingBag,
   Sparkles,
-  Layers
+  Layers,
+  RotateCcw
 } from 'lucide-react';
 import { Lorry, Customer, Order, Product } from '../types';
 import { LorryService, CustomerService, OrderService, ProductService } from '../services/api';
@@ -60,6 +61,98 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Draft persistence in localStorage
+  const DRAFT_KEY = 'distributor_bill_entry_draft';
+  const [hasDraft, setHasDraft] = useState<boolean>(() => {
+    try {
+      return !!localStorage.getItem(DRAFT_KEY);
+    } catch {
+      return false;
+    }
+  });
+
+  // Restore draft on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        const d = JSON.parse(saved);
+        if (d.billMode) setBillMode(d.billMode);
+        if (d.selectedLorryId) setSelectedLorryId(d.selectedLorryId);
+        if (d.paperBillNumber) setPaperBillNumber(d.paperBillNumber);
+        if (d.selectedCustomerId) setSelectedCustomerId(d.selectedCustomerId);
+        if (d.walkInName) setWalkInName(d.walkInName);
+        if (d.walkInPhone) setWalkInPhone(d.walkInPhone);
+        if (Array.isArray(d.billItems) && d.billItems.length > 0) {
+          setBillItems(d.billItems);
+        }
+        if (d.paymentMethod) setPaymentMethod(d.paymentMethod);
+        if (d.cashReceived) setCashReceived(d.cashReceived);
+        if (d.notes) setNotes(d.notes);
+        setHasDraft(true);
+      }
+    } catch (e) {
+      console.warn('Failed to restore bill entry draft:', e);
+    }
+  }, []);
+
+  // Auto-save draft on any input changes
+  useEffect(() => {
+    const hasContent =
+      paperBillNumber.trim() !== '' ||
+      walkInName.trim() !== '' ||
+      walkInPhone.trim() !== '' ||
+      notes.trim() !== '' ||
+      (selectedCustomerId !== '' && selectedCustomerId !== 'walk-in') ||
+      billItems.some(i => i.productId !== '');
+
+    if (hasContent) {
+      try {
+        localStorage.setItem(
+          DRAFT_KEY,
+          JSON.stringify({
+            billMode,
+            selectedLorryId,
+            paperBillNumber,
+            selectedCustomerId,
+            walkInName,
+            walkInPhone,
+            billItems,
+            paymentMethod,
+            cashReceived,
+            notes
+          })
+        );
+        setHasDraft(true);
+      } catch (e) {}
+    }
+  }, [
+    billMode,
+    selectedLorryId,
+    paperBillNumber,
+    selectedCustomerId,
+    walkInName,
+    walkInPhone,
+    billItems,
+    paymentMethod,
+    cashReceived,
+    notes
+  ]);
+
+  const handleClearForm = () => {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch (e) {}
+    setPaperBillNumber('');
+    setBillItems([{ productId: '', quantity: 1, freeQuantity: 0 }]);
+    setWalkInName('');
+    setWalkInPhone('');
+    setSelectedCustomerId(billMode === 'WALK_IN' ? 'walk-in' : '');
+    setCashReceived('');
+    setNotes('');
+    setHasDraft(false);
+  };
+
   useEffect(() => {
     loadData();
   }, []);
@@ -89,12 +182,11 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
     }
   };
 
-  // Handle mode switch
+  // Handle mode switch (preserve entered items without wiping)
   const handleModeSwitch = (mode: 'LORRY' | 'WALK_IN') => {
     setBillMode(mode);
     setErrorMessage(null);
     setSuccessMessage(null);
-    setBillItems([{ productId: '', quantity: 1, freeQuantity: 0 }]);
     if (mode === 'WALK_IN') {
       setSelectedCustomerId('walk-in');
     } else {
@@ -283,11 +375,17 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
         );
       }
 
-      // Reset form
+      // Reset form & remove draft
+      try {
+        localStorage.removeItem(DRAFT_KEY);
+      } catch (e) {}
+      setHasDraft(false);
       setPaperBillNumber('');
       setBillItems([{ productId: '', quantity: 1, freeQuantity: 0 }]);
       setWalkInName('');
       setWalkInPhone('');
+      setSelectedCustomerId(billMode === 'WALK_IN' ? 'walk-in' : '');
+      setCashReceived('');
       setNotes('');
 
       // Refresh list & stocks
@@ -741,24 +839,38 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
                 </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={submitting || availableItems.length === 0}
-                className={`w-full sm:w-auto px-6 py-3.5 active:scale-[0.99] text-white text-sm font-bold rounded-2xl shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 ${
-                  billMode === 'LORRY'
-                    ? 'bg-[#0071E3] hover:bg-blue-600'
-                    : 'bg-emerald-600 hover:bg-emerald-700'
-                }`}
-              >
-                <Receipt className="w-4 h-4" />
-                <span>
-                  {submitting
-                    ? 'Saving Bill...'
-                    : billMode === 'LORRY'
-                      ? 'Save Lorry Delivery Bill'
-                      : 'Save Walk-in Bill'}
-                </span>
-              </button>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                {hasDraft && (
+                  <button
+                    type="button"
+                    onClick={handleClearForm}
+                    className="px-4 py-3 rounded-2xl text-xs sm:text-sm font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 transition-colors flex items-center gap-1.5"
+                    title="Clear current draft"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Reset</span>
+                  </button>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={submitting || availableItems.length === 0}
+                  className={`flex-1 sm:flex-initial px-6 py-3.5 active:scale-[0.99] text-white text-sm font-bold rounded-2xl shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 ${
+                    billMode === 'LORRY'
+                      ? 'bg-[#0071E3] hover:bg-blue-600'
+                      : 'bg-emerald-600 hover:bg-emerald-700'
+                  }`}
+                >
+                  <Receipt className="w-4 h-4" />
+                  <span>
+                    {submitting
+                      ? 'Saving Bill...'
+                      : billMode === 'LORRY'
+                        ? 'Save Lorry Delivery Bill'
+                        : 'Save Walk-in Bill'}
+                  </span>
+                </button>
+              </div>
             </div>
           </form>
         </div>

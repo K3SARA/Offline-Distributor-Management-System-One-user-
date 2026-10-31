@@ -10,7 +10,8 @@ import {
   FileSpreadsheet,
   Printer,
   Boxes,
-  Compass
+  Compass,
+  RotateCcw
 } from 'lucide-react';
 import { Lorry, Product, LorryLoading as LorryLoadingType } from '../types';
 import { LorryService, ProductService } from '../services/api';
@@ -34,6 +35,64 @@ export const LorryLoading: React.FC = () => {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Draft persistence
+  const DRAFT_KEY = 'distributor_lorry_loading_draft';
+  const [hasDraft, setHasDraft] = useState<boolean>(() => {
+    try {
+      return !!localStorage.getItem(DRAFT_KEY);
+    } catch {
+      return false;
+    }
+  });
+
+  // Restore draft on initial load
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        const d = JSON.parse(saved);
+        if (d.selectedLorryId) setSelectedLorryId(d.selectedLorryId);
+        if (Array.isArray(d.loadingRows) && d.loadingRows.length > 0) {
+          setLoadingRows(d.loadingRows);
+        }
+        if (d.notes) setNotes(d.notes);
+        setHasDraft(true);
+      }
+    } catch (e) {
+      console.warn('Failed to restore loading draft', e);
+    }
+  }, []);
+
+  // Auto-save draft on any changes
+  useEffect(() => {
+    const hasContent =
+      notes.trim() !== '' ||
+      loadingRows.some(r => r.productId !== '' && r.quantity > 0);
+
+    if (hasContent) {
+      try {
+        localStorage.setItem(
+          DRAFT_KEY,
+          JSON.stringify({
+            selectedLorryId,
+            loadingRows,
+            notes
+          })
+        );
+        setHasDraft(true);
+      } catch (e) {}
+    }
+  }, [selectedLorryId, loadingRows, notes]);
+
+  const handleClearLoadingForm = () => {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch (e) {}
+    setLoadingRows([{ productId: '', quantity: 0 }]);
+    setNotes('');
+    setHasDraft(false);
+  };
 
   useEffect(() => {
     loadData();
@@ -69,7 +128,6 @@ export const LorryLoading: React.FC = () => {
   const handleLorryChange = (lorryId: string) => {
     setSelectedLorryId(lorryId);
     fetchActiveLoading(lorryId);
-    setLoadingRows([{ productId: '', quantity: 0 }]);
     setSuccessMessage(null);
     setErrorMessage(null);
   };
@@ -137,6 +195,10 @@ export const LorryLoading: React.FC = () => {
       setSuccessMessage(
         `Successfully loaded ${res.totalLoadedItems} units into Lorry ${selectedLorry?.vehicleNumber}! Warehouse stock deducted.`
       );
+      try {
+        localStorage.removeItem(DRAFT_KEY);
+      } catch (e) {}
+      setHasDraft(false);
       setLoadingRows([{ productId: '', quantity: 0 }]);
       setNotes('');
 
@@ -379,14 +441,28 @@ export const LorryLoading: React.FC = () => {
                 </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full sm:w-auto px-6 py-3 bg-[#0071E3] hover:bg-blue-600 active:scale-[0.99] text-white text-xs font-bold rounded-2xl shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-              >
-                <PackageCheck className="w-4 h-4" />
-                <span>{submitting ? 'Transferring Stock...' : 'Confirm & Load Lorry'}</span>
-              </button>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                {hasDraft && (
+                  <button
+                    type="button"
+                    onClick={handleClearLoadingForm}
+                    className="px-4 py-3 rounded-2xl text-xs sm:text-sm font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 transition-colors flex items-center gap-1.5"
+                    title="Clear current loading draft"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Reset</span>
+                  </button>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 sm:flex-initial px-6 py-3 bg-[#0071E3] hover:bg-blue-600 active:scale-[0.99] text-white text-xs font-bold rounded-2xl shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                >
+                  <PackageCheck className="w-4 h-4" />
+                  <span>{submitting ? 'Transferring Stock...' : 'Confirm & Load Lorry'}</span>
+                </button>
+              </div>
             </div>
           </form>
         </div>
