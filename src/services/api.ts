@@ -17,7 +17,8 @@ import {
   CustomerPayment,
   Recipe,
   ProductionRun,
-  ManufacturingSummary
+  ManufacturingSummary,
+  LorryPerformanceReport
 } from '../types';
 
 // Dynamic API URL: uses relative '/api' on Railway / production web,
@@ -132,7 +133,7 @@ export const ReportService = {
   getDashboardStats: (from?: string, to?: string) =>
     api.get<DashboardStats>('/reports/dashboard-stats', { params: { from, to } }).then(r => r.data),
   getLorryPerformance: (from?: string, to?: string) =>
-    api.get<LorryLoading[]>('/reports/lorry-performance', { params: { from, to } }).then(r => r.data),
+    api.get<LorryPerformanceReport>('/reports/lorry-performance', { params: { from, to } }).then(r => r.data),
   getRouteSales: (from?: string, to?: string) =>
     api.get<any[]>('/reports/route-sales', { params: { from, to } }).then(r => r.data),
   getSalesSummary: (from?: string, to?: string, lorryId?: string, routeId?: string) =>

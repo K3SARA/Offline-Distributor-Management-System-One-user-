@@ -450,7 +450,6 @@ export interface ProductionRun {
   updatedAt: string;
   items?: ProductionRunItem[];
 }
-
 export interface ManufacturingSummary {
   totalBatchesCount: number;
   totalUnitsManufactured: number;
@@ -458,4 +457,37 @@ export interface ManufacturingSummary {
   activeRecipesCount: number;
 }
 
+export interface LorryWiseSummary {
+  lorryId: string;
+  vehicleNumber: string;
+  driverName: string;
+  routeName?: string | null;
+  routeCode?: string | null;
+  loadingsCount: number;
+  ordersCount: number;
+  totalAllSales: number;
+  totalCashSales: number;
+  totalCreditSale: number;
+  cashRatio: number;
+  totalSoldItems: number;
+}
 
+export interface LorryPerformanceReport {
+  summary: {
+    totalAllSales: number;
+    totalCashSales: number;
+    totalCreditSale: number;
+    totalLoadedItems: number;
+    totalSoldItems: number;
+    totalFreeItems: number;
+    totalReturnedItems: number;
+    activeLorriesCount: number;
+    totalLoadingsCount: number;
+  };
+  lorrySummaries: LorryWiseSummary[];
+  loadings: (LorryLoading & {
+    totalAllSales: number;
+    totalCashSales: number;
+    totalCreditSale: number;
+  })[];
+}

@@ -12,10 +12,11 @@ import {
   Truck,
   Compass,
   RotateCcw,
-  TrendingUp
+  TrendingUp,
+  Receipt
 } from 'lucide-react';
 import { ReportService } from '../services/api';
-import { StockMovement, Customer, LorryLoading } from '../types';
+import { StockMovement, Customer, LorryLoading, LorryPerformanceReport } from '../types';
 import { useCurrency } from '../context/CurrencyContext';
 import { DateRangeFilter, DatePreset } from '../components/DateRangeFilter';
 import { ProfitAndLoss } from './ProfitAndLoss';
@@ -30,7 +31,8 @@ export const Reports: React.FC = () => {
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
 
   // Data
-  const [lorryLoadings, setLorryLoadings] = useState<LorryLoading[]>([]);
+  const [lorryReport, setLorryReport] = useState<LorryPerformanceReport | null>(null);
+  const [lorryLoadings, setLorryLoadings] = useState<any[]>([]);
   const [routeSummaries, setRouteSummaries] = useState<any[]>([]);
   const [salesData, setSalesData] = useState<any>(null);
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
@@ -45,7 +47,13 @@ export const Reports: React.FC = () => {
     try {
       if (activeTab === 'LORRIES') {
         const data = await ReportService.getLorryPerformance(dateRange.from, dateRange.to);
-        setLorryLoadings(data);
+        if (data && 'summary' in data) {
+          setLorryReport(data);
+          setLorryLoadings(data.loadings || []);
+        } else {
+          setLorryReport(null);
+          setLorryLoadings(Array.isArray(data) ? data : []);
+        }
       } else if (activeTab === 'ROUTES') {
         const data = await ReportService.getRouteSales(dateRange.from, dateRange.to);
         setRouteSummaries(data);
@@ -92,9 +100,12 @@ export const Reports: React.FC = () => {
     let csvContent = 'data:text/csv;charset=utf-8,';
 
     if (activeTab === 'LORRIES') {
-      csvContent += 'Loading Number,Date,Lorry,Driver,Route,Status,Loaded Units,Paid Sold Units,Free Issue Units,Returned Units,Sales Amount,Cash Collected\n';
+      csvContent += 'Loading Number,Date,Lorry,Driver,Route,Status,Loaded Units,Paid Sold Units,Free Issue Units,Returned Units,Total All Sales,Cash Sales,Credit Sales\n';
       lorryLoadings.forEach((l) => {
-        csvContent += `"${l.loadingNumber}","${new Date(l.date).toLocaleDateString()}","${l.lorry.vehicleNumber}","${l.lorry.driverName}","${l.lorry.route?.name || ''}","${l.status}",${l.totalLoadedItems},${l.totalSoldItems},${l.totalFreeItems || 0},${l.totalReturnedItems},${l.totalSalesAmount},${l.cashCollected}\n`;
+        const allSales = l.totalAllSales ?? l.totalSalesAmount ?? 0;
+        const cashSales = l.totalCashSales ?? l.cashCollected ?? 0;
+        const creditSales = l.totalCreditSale ?? (l.creditGiven > 0 ? l.creditGiven : Math.max(0, allSales - cashSales));
+        csvContent += `"${l.loadingNumber}","${new Date(l.date).toLocaleDateString()}","${l.lorry?.vehicleNumber || ''}","${l.lorry?.driverName || ''}","${l.lorry?.route?.name || ''}","${l.status}",${l.totalLoadedItems},${l.totalSoldItems},${l.totalFreeItems || 0},${l.totalReturnedItems},${allSales},${cashSales},${creditSales}\n`;
       });
     } else if (activeTab === 'ROUTES') {
       csvContent += 'Route Code,Route Name,Driver / Lorry,Customers,Total Bills,Total Sales,Cash Collected,Credit Given\n';
@@ -243,76 +254,285 @@ export const Reports: React.FC = () => {
         </div>
 
         {/* 1. LORRIES REPORT */}
-        {activeTab === 'LORRIES' && (
-          <div className="space-y-4">
-            <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-              <table className="w-full text-left border-collapse text-sm min-w-[760px]">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-100">
-                    <th className="py-3 px-3.5">Gate Pass #</th>
-                    <th className="py-3 px-3.5">Date</th>
-                    <th className="py-3 px-3.5">Lorry / Driver</th>
-                    <th className="py-3 px-3.5">Route</th>
-                    <th className="py-3 px-3.5 text-center">Loaded</th>
-                    <th className="py-3 px-3.5 text-center">Paid Sold</th>
-                    <th className="py-3 px-3.5 text-center">Free Issued</th>
-                    <th className="py-3 px-3.5 text-center">Returned</th>
-                    <th className="py-3 px-3.5 text-right">Sales Value</th>
-                    <th className="py-3 px-3.5 text-right">Cash Handover</th>
-                    <th className="py-3 px-3.5 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {lorryLoadings.length === 0 ? (
-                    <tr>
-                      <td colSpan={11} className="p-8 text-center text-slate-400">
-                        No lorry loadings recorded for {getPresetLabel().toLowerCase()}.
-                      </td>
-                    </tr>
-                  ) : (
-                    lorryLoadings.map((load) => (
-                      <tr key={load.id} className="hover:bg-slate-50/50">
-                        <td className="py-3 px-3.5 font-mono font-bold text-slate-900">{load.loadingNumber}</td>
-                        <td className="py-3 px-3.5 text-slate-500 font-mono">
-                          {new Date(load.date).toLocaleDateString()}
-                        </td>
-                        <td className="py-3 px-3.5">
-                          <span className="font-bold text-slate-800 block">{load.lorry.vehicleNumber}</span>
-                          <span className="text-slate-400">{load.lorry.driverName}</span>
-                        </td>
-                        <td className="py-3 px-3.5 font-medium text-slate-700">{load.lorry.route?.name || '—'}</td>
-                        <td className="py-3 px-3.5 text-center font-mono font-bold text-slate-900">{load.totalLoadedItems}</td>
-                        <td className="py-3 px-3.5 text-center font-mono font-bold text-emerald-600">{load.totalSoldItems}</td>
-                        <td className="py-3 px-3.5 text-center font-mono font-semibold text-blue-600">
-                          {load.totalFreeItems > 0 ? (
-                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded font-bold text-xs">
-                              +{load.totalFreeItems}
-                            </span>
-                          ) : (
-                            <span className="text-slate-300">0</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-3.5 text-center font-mono font-bold text-blue-600">{load.totalReturnedItems}</td>
-                        <td className="py-3 px-3.5 text-right font-mono font-bold text-slate-900">{formatMoney(load.totalSalesAmount)}</td>
-                        <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-600">{formatMoney(load.cashCollected)}</td>
-                        <td className="py-3 px-3.5 text-center">
-                          <span
-                            className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase ${load.status === 'SETTLED'
-                                ? 'bg-slate-100 text-slate-600'
-                                : 'bg-blue-50 text-blue-700 border border-blue-200/60'
-                              }`}
-                          >
-                            {load.status}
+        {activeTab === 'LORRIES' && (() => {
+          const fallbackAllSales = lorryLoadings.reduce((sum, l) => sum + (l.totalAllSales ?? l.totalSalesAmount ?? 0), 0);
+          const fallbackCashSales = lorryLoadings.reduce((sum, l) => sum + (l.totalCashSales ?? l.cashCollected ?? 0), 0);
+          const fallbackCreditSale = lorryLoadings.reduce((sum, l) => sum + (l.totalCreditSale ?? (l.creditGiven > 0 ? l.creditGiven : Math.max(0, (l.totalAllSales ?? l.totalSalesAmount ?? 0) - (l.totalCashSales ?? l.cashCollected ?? 0)))), 0);
+
+          const summary = lorryReport?.summary || {
+            totalAllSales: fallbackAllSales,
+            totalCashSales: fallbackCashSales,
+            totalCreditSale: fallbackCreditSale,
+            totalLoadedItems: lorryLoadings.reduce((sum, l) => sum + (l.totalLoadedItems || 0), 0),
+            totalSoldItems: lorryLoadings.reduce((sum, l) => sum + (l.totalSoldItems || 0), 0),
+            totalFreeItems: lorryLoadings.reduce((sum, l) => sum + (l.totalFreeItems || 0), 0),
+            totalReturnedItems: lorryLoadings.reduce((sum, l) => sum + (l.totalReturnedItems || 0), 0),
+            activeLorriesCount: lorryReport?.lorrySummaries?.length || 3,
+            totalLoadingsCount: lorryLoadings.length
+          };
+
+          const cashRatio = summary.totalAllSales > 0 ? Math.round((summary.totalCashSales / summary.totalAllSales) * 100) : 0;
+          const creditRatio = summary.totalAllSales > 0 ? Math.round((summary.totalCreditSale / summary.totalAllSales) * 100) : 0;
+          const lorrySummaries = lorryReport?.lorrySummaries || [];
+
+          return (
+            <div className="space-y-6">
+              {/* Ultra Minimal 3-Card Unified Fleet Summary */}
+              <div>
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    Fleet Sales & Settlement Summary ({getPresetLabel()})
+                  </span>
+                  <span className="text-xs font-semibold text-slate-500">
+                    {summary.totalLoadingsCount} dispatches • {summary.totalSoldItems} units sold
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                  {/* Card 1: Total All Sales */}
+                  <div className="p-4 sm:p-5 bg-white border border-slate-200/80 rounded-2xl sm:rounded-3xl shadow-2xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                        Total All Sales
+                      </span>
+                      <span className="p-1.5 rounded-xl bg-blue-50 text-blue-600">
+                        <Receipt className="w-4 h-4" />
+                      </span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-bold font-mono text-slate-900">
+                      {formatMoney(summary.totalAllSales)}
+                    </div>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Gross dispatched turnover across all 3 lorries
+                    </p>
+                  </div>
+
+                  {/* Card 2: Total Cash Sales */}
+                  <div className="p-4 sm:p-5 bg-emerald-50/60 border border-emerald-200/70 rounded-2xl sm:rounded-3xl shadow-2xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">
+                        Total Cash Sales
+                      </span>
+                      <span className="text-xs font-bold font-mono px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200/60">
+                        {cashRatio}%
+                      </span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-bold font-mono text-emerald-700">
+                      {formatMoney(summary.totalCashSales)}
+                    </div>
+                    <p className="text-[11px] text-emerald-700 font-medium">
+                      Actual physical cash collected & settled
+                    </p>
+                  </div>
+
+                  {/* Card 3: Total Credit Sale */}
+                  <div className="p-4 sm:p-5 bg-amber-50/60 border border-amber-200/70 rounded-2xl sm:rounded-3xl shadow-2xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800">
+                        Total Credit Sale
+                      </span>
+                      <span className="text-xs font-bold font-mono px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200/60">
+                        {creditRatio}%
+                      </span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-bold font-mono text-amber-700">
+                      {formatMoney(summary.totalCreditSale)}
+                    </div>
+                    <p className="text-[11px] text-amber-700 font-medium">
+                      Unpaid balances & customer credit pending
+                    </p>
+                  </div>
+                </div>
+
+                {/* Cash vs Credit Fleet Split Bar */}
+                <div className="mt-3 p-3 bg-slate-50/80 rounded-2xl border border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-3 font-medium text-slate-600">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                      Cash: <strong className="text-slate-900 font-mono">{formatMoney(summary.totalCashSales)}</strong> ({cashRatio}%)
+                    </span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                      Credit: <strong className="text-slate-900 font-mono">{formatMoney(summary.totalCreditSale)}</strong> ({creditRatio}%)
+                    </span>
+                  </div>
+
+                  <div className="w-full sm:w-48 h-2 bg-slate-200 rounded-full overflow-hidden flex">
+                    <div style={{ width: `${cashRatio}%` }} className="h-full bg-emerald-500 transition-all duration-300" title={`Cash: ${cashRatio}%`} />
+                    <div style={{ width: `${creditRatio}%` }} className="h-full bg-amber-400 transition-all duration-300" title={`Credit: ${creditRatio}%`} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Lorry-Wise Reconciliation Cards */}
+              {lorrySummaries.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Lorry-Wise Cash & Credit Reconciliation
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      Individual vehicle breakdown
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                    {lorrySummaries.map((l) => (
+                      <div key={l.lorryId} className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-2xs space-y-3 hover:border-slate-300 transition">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-xl">
+                            {l.vehicleNumber}
                           </span>
-                        </td>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200/60">
+                            {l.routeName || 'Assigned Route'}
+                          </span>
+                        </div>
+
+                        <div>
+                          <div className="text-xs text-slate-500">
+                            Driver: <strong className="text-slate-800">{l.driverName}</strong>
+                          </div>
+                          <div className="flex items-baseline justify-between mt-1.5">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Total Sales</span>
+                            <span className="font-mono font-bold text-slate-900 text-base">
+                              {formatMoney(l.totalAllSales)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Side-by-Side Cash vs Credit */}
+                        <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
+                          <div className="p-2 bg-emerald-50/60 rounded-xl border border-emerald-100/70">
+                            <span className="text-[9px] uppercase font-bold text-emerald-800 block">Cash Sales</span>
+                            <span className="font-mono font-bold text-emerald-700 text-xs block mt-0.5">
+                              {formatMoney(l.totalCashSales)}
+                            </span>
+                            <span className="text-[9px] text-emerald-600 block mt-0.5 font-medium">
+                              {Math.round(l.cashRatio)}% Cash
+                            </span>
+                          </div>
+
+                          <div className="p-2 bg-amber-50/60 rounded-xl border border-amber-100/70">
+                            <span className="text-[9px] uppercase font-bold text-amber-800 block">Credit Sale</span>
+                            <span className="font-mono font-bold text-amber-700 text-xs block mt-0.5">
+                              {formatMoney(l.totalCreditSale)}
+                            </span>
+                            <span className="text-[9px] text-amber-600 block mt-0.5 font-medium">
+                              {Math.round(100 - l.cashRatio)}% Credit
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Lorry Loadings Detailed Ledger Table */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs">
+                <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Morning Load & Evening Settlement Log
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-semibold bg-white border border-slate-200 px-2 py-0.5 rounded-md">
+                    {getPresetLabel()}
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+                  <table className="w-full text-left border-collapse text-xs min-w-[840px]">
+                    <thead>
+                      <tr className="bg-slate-50/80 text-slate-500 text-[11px] font-bold uppercase tracking-wider border-b border-slate-100">
+                        <th className="py-3 px-3.5">Gate Pass #</th>
+                        <th className="py-3 px-3.5">Date</th>
+                        <th className="py-3 px-3.5">Lorry / Driver</th>
+                        <th className="py-3 px-3.5">Route</th>
+                        <th className="py-3 px-3 text-center">Loaded</th>
+                        <th className="py-3 px-3 text-center">Paid Sold</th>
+                        <th className="py-3 px-3 text-center">Free</th>
+                        <th className="py-3 px-3 text-center">Returned</th>
+                        <th className="py-3 px-3.5 text-right">Total All Sales</th>
+                        <th className="py-3 px-3.5 text-right text-emerald-700">Cash Sales</th>
+                        <th className="py-3 px-3.5 text-right text-amber-700">Credit Sale</th>
+                        <th className="py-3 px-3.5 text-center">Status</th>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                      {lorryLoadings.length === 0 ? (
+                        <tr>
+                          <td colSpan={12} className="p-8 text-center text-slate-400">
+                            No lorry loadings recorded for {getPresetLabel().toLowerCase()}.
+                          </td>
+                        </tr>
+                      ) : (
+                        lorryLoadings.map((load) => {
+                          const allSales = load.totalAllSales ?? load.totalSalesAmount ?? 0;
+                          const cashSales = load.totalCashSales ?? load.cashCollected ?? 0;
+                          const creditSales = load.totalCreditSale ?? (load.creditGiven > 0 ? load.creditGiven : Math.max(0, allSales - cashSales));
+
+                          return (
+                            <tr key={load.id} className="hover:bg-slate-50/50 transition">
+                              <td className="py-3 px-3.5 font-mono font-bold text-slate-900">{load.loadingNumber}</td>
+                              <td className="py-3 px-3.5 text-slate-500 font-mono">
+                                {new Date(load.date).toLocaleDateString()}
+                              </td>
+                              <td className="py-3 px-3.5">
+                                <span className="font-bold text-slate-800 block">{load.lorry?.vehicleNumber}</span>
+                                <span className="text-slate-400 text-[11px]">{load.lorry?.driverName}</span>
+                              </td>
+                              <td className="py-3 px-3.5 font-medium text-slate-700">{load.lorry?.route?.name || '—'}</td>
+                              <td className="py-3 px-3 text-center font-mono font-bold text-slate-900">{load.totalLoadedItems}</td>
+                              <td className="py-3 px-3 text-center font-mono font-bold text-emerald-600">{load.totalSoldItems}</td>
+                              <td className="py-3 px-3 text-center font-mono font-semibold text-blue-600">
+                                {load.totalFreeItems > 0 ? (
+                                  <span className="px-1.5 py-0.2 bg-blue-50 text-blue-700 rounded font-bold text-[11px]">
+                                    +{load.totalFreeItems}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300">0</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-3 text-center font-mono font-bold text-blue-600">{load.totalReturnedItems}</td>
+                              <td className="py-3 px-3.5 text-right font-mono font-bold text-slate-900">{formatMoney(allSales)}</td>
+                              <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-600 bg-emerald-50/20">{formatMoney(cashSales)}</td>
+                              <td className="py-3 px-3.5 text-right font-mono font-bold text-amber-600 bg-amber-50/20">{formatMoney(creditSales)}</td>
+                              <td className="py-3 px-3.5 text-center">
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${load.status === 'SETTLED'
+                                      ? 'bg-slate-100 text-slate-600'
+                                      : 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                                    }`}
+                                >
+                                  {load.status}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                    <tfoot className="bg-slate-50/90 border-t-2 border-slate-200 font-bold text-xs text-slate-900">
+                      <tr>
+                        <td colSpan={4} className="py-3.5 px-3.5 uppercase tracking-wider text-slate-600 font-extrabold text-[11px]">
+                          All Dispatches Total
+                        </td>
+                        <td className="py-3.5 px-3 text-center font-mono">{summary.totalLoadedItems}</td>
+                        <td className="py-3.5 px-3 text-center font-mono text-emerald-600">{summary.totalSoldItems}</td>
+                        <td className="py-3.5 px-3 text-center font-mono text-blue-600">{summary.totalFreeItems}</td>
+                        <td className="py-3.5 px-3 text-center font-mono text-blue-600">{summary.totalReturnedItems}</td>
+                        <td className="py-3.5 px-3.5 text-right font-mono text-slate-900">{formatMoney(summary.totalAllSales)}</td>
+                        <td className="py-3.5 px-3.5 text-right font-mono text-emerald-700 bg-emerald-100/40">{formatMoney(summary.totalCashSales)}</td>
+                        <td className="py-3.5 px-3.5 text-right font-mono text-amber-700 bg-amber-100/40">{formatMoney(summary.totalCreditSale)}</td>
+                        <td className="py-3.5 px-3.5 text-center font-mono text-[11px] text-slate-700">{cashRatio}% Cash</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* 2. ROUTES REPORT */}
         {activeTab === 'ROUTES' && (() => {

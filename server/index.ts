@@ -1782,25 +1782,124 @@ app.get('/api/reports/dashboard-stats', async (req: Request, res: Response) => {
 app.get('/api/reports/lorry-performance', async (req: Request, res: Response) => {
   try {
     const { from, to } = req.query;
-    const where: any = {};
+    const loadingWhere: any = {};
+    const orderWhere: any = { status: { not: 'CANCELLED' } };
     if (from || to) {
-      where.date = {
-        gte: from ? new Date(from as string) : undefined,
-        lte: to ? new Date(to as string) : undefined
-      };
+      const gte = from ? new Date(from as string) : undefined;
+      const lte = to ? new Date(to as string) : undefined;
+      loadingWhere.date = { gte, lte };
+      orderWhere.createdAt = { gte, lte };
     }
 
-    const loadings = await prisma.lorryLoading.findMany({
-      where,
-      include: {
-        lorry: { include: { route: true } },
-        items: { include: { product: true } }
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100
+    const [loadings, lorries, orders] = await Promise.all([
+      prisma.lorryLoading.findMany({
+        where: loadingWhere,
+        include: {
+          lorry: { include: { route: true } },
+          items: { include: { product: true } }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 100
+      }),
+      prisma.lorry.findMany({
+        include: { route: true },
+        orderBy: { vehicleNumber: 'asc' }
+      }),
+      prisma.order.findMany({
+        where: orderWhere,
+        select: {
+          id: true,
+          lorryId: true,
+          netTotal: true,
+          cashReceived: true,
+          createdAt: true
+        }
+      })
+    ]);
+
+    // Compute sales, cash, credit for each loading sheet
+    const enrichedLoadings = loadings.map(load => {
+      const loadDateStr = new Date(load.date).toISOString().slice(0, 10);
+      const matchingOrders = orders.filter(o => 
+        o.lorryId === load.lorryId && 
+        new Date(o.createdAt).toISOString().slice(0, 10) === loadDateStr
+      );
+
+      const ordersTotal = matchingOrders.reduce((acc, o) => acc + (o.netTotal || 0), 0);
+      const ordersCash = matchingOrders.reduce((acc, o) => acc + Math.min(o.netTotal || 0, o.cashReceived || 0), 0);
+
+      const totalAllSales = Math.max(load.totalSalesAmount || 0, ordersTotal);
+      const totalCashSales = load.cashCollected > 0 ? load.cashCollected : ordersCash;
+      const totalCreditSale = load.creditGiven > 0 ? load.creditGiven : Math.max(0, totalAllSales - totalCashSales);
+
+      return {
+        ...load,
+        totalAllSales,
+        totalCashSales,
+        totalCreditSale
+      };
     });
 
-    res.json(loadings);
+    // Compute lorry-wise summaries
+    const lorrySummaries = lorries.map(l => {
+      const lorryLoads = enrichedLoadings.filter(ld => ld.lorryId === l.id);
+      const lorryOrders = orders.filter(o => o.lorryId === l.id);
+
+      const loadsSales = lorryLoads.reduce((sum, ld) => sum + ld.totalAllSales, 0);
+      const loadsCash = lorryLoads.reduce((sum, ld) => sum + ld.totalCashSales, 0);
+      const loadsCredit = lorryLoads.reduce((sum, ld) => sum + ld.totalCreditSale, 0);
+
+      const ordersSales = lorryOrders.reduce((sum, o) => sum + (o.netTotal || 0), 0);
+      const ordersCash = lorryOrders.reduce((sum, o) => sum + Math.min(o.netTotal || 0, o.cashReceived || 0), 0);
+
+      const totalAllSales = Math.max(loadsSales, ordersSales);
+      const totalCashSales = loadsCash > 0 ? loadsCash : ordersCash;
+      const totalCreditSale = loadsCredit > 0 ? loadsCredit : Math.max(0, totalAllSales - totalCashSales);
+      const cashRatio = totalAllSales > 0 ? (totalCashSales / totalAllSales) * 100 : 0;
+      const totalSoldItems = lorryLoads.reduce((sum, ld) => sum + ld.totalSoldItems, 0);
+
+      return {
+        lorryId: l.id,
+        vehicleNumber: l.vehicleNumber,
+        driverName: l.driverName,
+        routeName: l.route?.name || null,
+        routeCode: l.route?.code || null,
+        loadingsCount: lorryLoads.length,
+        ordersCount: lorryOrders.length,
+        totalAllSales,
+        totalCashSales,
+        totalCreditSale,
+        cashRatio,
+        totalSoldItems
+      };
+    });
+
+    // Compute fleet-wide totals
+    const totalAllSales = lorrySummaries.reduce((sum, l) => sum + l.totalAllSales, 0);
+    const totalCashSales = lorrySummaries.reduce((sum, l) => sum + l.totalCashSales, 0);
+    const totalCreditSale = lorrySummaries.reduce((sum, l) => sum + l.totalCreditSale, 0);
+    const totalLoadedItems = enrichedLoadings.reduce((sum, ld) => sum + ld.totalLoadedItems, 0);
+    const totalSoldItems = enrichedLoadings.reduce((sum, ld) => sum + ld.totalSoldItems, 0);
+    const totalFreeItems = enrichedLoadings.reduce((sum, ld) => sum + (ld.totalFreeItems || 0), 0);
+    const totalReturnedItems = enrichedLoadings.reduce((sum, ld) => sum + ld.totalReturnedItems, 0);
+
+    const summary = {
+      totalAllSales,
+      totalCashSales,
+      totalCreditSale,
+      totalLoadedItems,
+      totalSoldItems,
+      totalFreeItems,
+      totalReturnedItems,
+      activeLorriesCount: lorries.length,
+      totalLoadingsCount: enrichedLoadings.length
+    };
+
+    res.json({
+      summary,
+      lorrySummaries,
+      loadings: enrichedLoadings
+    });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
