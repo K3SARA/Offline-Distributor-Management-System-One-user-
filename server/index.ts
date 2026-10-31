@@ -960,52 +960,104 @@ app.get('/api/orders/:id', async (req: Request, res: Response) => {
   }
 });
 
-// Create counter POS order (Direct warehouse sale if needed)
+// Create counter POS order (Direct warehouse sale for Walk-in or direct customers)
 app.post('/api/orders', async (req: Request, res: Response) => {
-  const { customerId, items, notes, paymentStatus, paymentMethod, cashReceived, lorryId } = req.body;
+  const {
+    customerId,
+    walkInName,
+    walkInPhone,
+    paperBillNumber,
+    items,
+    notes,
+    paymentStatus,
+    paymentMethod,
+    cashReceived,
+    lorryId
+  } = req.body;
 
   if (lorryId) {
     // Forward to lorry bill entry logic
     return res.redirect(307, `/api/lorries/${lorryId}/bills`);
   }
 
-  if (!customerId || !Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ error: 'Customer and line items are required.' });
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'At least one line item is required for the bill.' });
   }
 
   try {
     const newOrder = await prisma.$transaction(async (tx) => {
-      const customer = await tx.customer.findUniqueOrThrow({ where: { id: customerId } });
+      let customer;
+      if (!customerId || customerId === 'walk-in' || customerId === 'WALK-IN') {
+        customer = await tx.customer.findUnique({ where: { code: 'WALK-IN' } });
+        if (!customer) {
+          customer = await tx.customer.create({
+            data: {
+              code: 'WALK-IN',
+              name: walkInName ? `Walk-in: ${walkInName.trim()}` : 'Walk-in Cash Customer',
+              companyName: 'Counter Customer',
+              phone: walkInPhone?.trim() || '—',
+              deliveryAddress: 'Direct Warehouse Sales Counter',
+              city: 'Warehouse Counter',
+              pricingTier: 'STANDARD',
+              discountPercentage: 0.0,
+              creditLimit: 0,
+              outstandingBalance: 0
+            }
+          });
+        }
+      } else {
+        customer = await tx.customer.findUniqueOrThrow({ where: { id: customerId } });
+      }
 
       let subtotal = 0;
+      let totalBilledUnits = 0;
+      let totalFreeUnits = 0;
       const orderItemsToCreate = [];
 
       for (const item of items) {
         const product = await tx.product.findUniqueOrThrow({ where: { id: item.productId } });
+        const qty = parseInt(item.quantity, 10) || 0;
+        const freeQty = parseInt(item.freeQuantity, 10) || 0;
+        const totalNeeded = qty + freeQty;
 
-        if (product.currentStock < item.quantity) {
-          throw new Error(`Insufficient warehouse stock for "${product.name}". Only ${product.currentStock} ${product.unit} available.`);
+        if (qty <= 0 && freeQty <= 0) continue;
+
+        if (product.currentStock < totalNeeded) {
+          throw new Error(
+            `Insufficient warehouse stock for "${product.name}". Available in warehouse: ${product.currentStock} ${product.unit}, required: ${qty} sold + ${freeQty} free (${totalNeeded} total)`
+          );
         }
 
-        const lineTotal = product.unitPrice * item.quantity;
+        const lineTotal = product.unitPrice * qty;
         subtotal += lineTotal;
+        totalBilledUnits += qty;
+        totalFreeUnits += freeQty;
 
         orderItemsToCreate.push({
           productId: product.id,
-          quantity: item.quantity,
+          quantity: qty,
+          freeQuantity: freeQty,
           unitPrice: product.unitPrice,
           lineTotal
         });
 
+        // Deduct from Warehouse Main Stock
         await tx.product.update({
           where: { id: product.id },
-          data: { currentStock: { decrement: item.quantity } }
+          data: { currentStock: { decrement: totalNeeded } }
         });
+      }
+
+      if (orderItemsToCreate.length === 0) {
+        throw new Error('All bill item quantities are zero.');
       }
 
       const discountPercentage = customer.discountPercentage || 0;
       const discountAmount = (subtotal * discountPercentage) / 100;
       const netTotal = subtotal - discountAmount;
+
+      const paidAmount = parseFloat(cashReceived !== undefined && cashReceived !== '' ? cashReceived : (paymentMethod === 'CASH' ? netTotal : 0));
+      const calculatedPaymentStatus = paymentStatus || (paidAmount >= netTotal ? 'PAID' : (paidAmount > 0 ? 'PARTIAL' : 'UNPAID'));
 
       const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       const countToday = await tx.order.count({
@@ -1020,16 +1072,19 @@ app.post('/api/orders', async (req: Request, res: Response) => {
       const createdOrder = await tx.order.create({
         data: {
           orderNumber,
-          customerId,
+          paperBillNumber: paperBillNumber?.trim() || null,
+          customerId: customer.id,
+          lorryId: null, // Direct warehouse counter sale
+          routeId: customer.routeId || null,
           status: 'DELIVERED',
-          paymentStatus: paymentStatus || 'PAID',
+          paymentStatus: calculatedPaymentStatus,
           paymentMethod: paymentMethod || 'CASH',
           subtotal,
           discountAmount,
           taxAmount: 0.0,
           netTotal,
-          cashReceived: cashReceived !== undefined ? parseFloat(cashReceived) : netTotal,
-          notes: notes?.trim() || 'Counter Warehouse Sale',
+          cashReceived: paidAmount,
+          notes: notes?.trim() || (walkInName ? `Walk-in: ${walkInName}` : 'Warehouse Direct Counter Sale'),
           items: {
             create: orderItemsToCreate
           }
@@ -1040,23 +1095,26 @@ app.post('/api/orders', async (req: Request, res: Response) => {
         }
       });
 
-      for (const item of items) {
+      // Record Stock Movement Outbound
+      for (const item of orderItemsToCreate) {
+        const totalOut = item.quantity + (item.freeQuantity || 0);
         await tx.stockMovement.create({
           data: {
             productId: item.productId,
             type: 'OUTBOUND',
-            quantity: -item.quantity,
+            quantity: -totalOut,
             referenceId: createdOrder.orderNumber,
-            notes: `Counter Sale to ${customer.name}`
+            notes: `Counter Sale ${createdOrder.orderNumber} to ${customer.name}${item.freeQuantity ? ` (${item.freeQuantity} free promo)` : ''}`
           }
         });
       }
 
-      if (paymentStatus !== 'PAID') {
-        const remainingCredit = netTotal - (cashReceived ? parseFloat(cashReceived) : 0);
+      // If credit given and customer is an account holder
+      if (calculatedPaymentStatus !== 'PAID' && customer.code !== 'WALK-IN') {
+        const remainingCredit = netTotal - paidAmount;
         if (remainingCredit > 0) {
           await tx.customer.update({
-            where: { id: customerId },
+            where: { id: customer.id },
             data: { outstandingBalance: { increment: remainingCredit } }
           });
         }
@@ -1660,6 +1718,25 @@ async function seedIfEmpty() {
             outstandingBalance: 0.0
           }
         ]
+    }
+
+    // Ensure default Walk-in Customer exists
+    const walkInCustomer = await prisma.customer.findUnique({ where: { code: 'WALK-IN' } });
+    if (!walkInCustomer) {
+      console.log('[Auto-Seed] Seeding Walk-in Cash Customer...');
+      await prisma.customer.create({
+        data: {
+          code: 'WALK-IN',
+          name: 'Walk-in Cash Customer',
+          companyName: 'Counter Desk Sale',
+          phone: '—',
+          deliveryAddress: 'Warehouse Direct Sales Counter',
+          city: 'Warehouse Counter',
+          pricingTier: 'STANDARD',
+          discountPercentage: 0.0,
+          creditLimit: 0,
+          outstandingBalance: 0
+        }
       });
     }
 

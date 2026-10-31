@@ -89,8 +89,11 @@ export const OrderService = {
   getById: (id: string) =>
     api.get<Order>(`/orders/${id}`).then(r => r.data),
   create: (payload: {
-    customerId: string;
-    items: { productId: string; quantity: number }[];
+    customerId?: string;
+    walkInName?: string;
+    walkInPhone?: string;
+    paperBillNumber?: string;
+    items: { productId: string; quantity: number; freeQuantity?: number }[];
     paymentStatus?: string;
     paymentMethod?: string;
     cashReceived?: number;

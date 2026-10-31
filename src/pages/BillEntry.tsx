@@ -12,10 +12,15 @@ import {
   Compass,
   Calendar,
   CreditCard,
-  Eye
+  Eye,
+  Building2,
+  Store,
+  ShoppingBag,
+  Sparkles,
+  Layers
 } from 'lucide-react';
 import { Lorry, Customer, Order, Product } from '../types';
-import { LorryService, CustomerService, OrderService } from '../services/api';
+import { LorryService, CustomerService, OrderService, ProductService } from '../services/api';
 import { useCurrency } from '../context/CurrencyContext';
 
 interface BillItemRow {
@@ -30,14 +35,21 @@ interface BillEntryProps {
 
 export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
   const { formatMoney } = useCurrency();
+
+  // Mode: LORRY (Evening driver paper slip entry) vs WALK_IN (Counter / Walk-in sale from warehouse)
+  const [billMode, setBillMode] = useState<'LORRY' | 'WALK_IN'>('LORRY');
+
   const [lorries, setLorries] = useState<Lorry[]>([]);
   const [selectedLorryId, setSelectedLorryId] = useState<string>('');
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [warehouseProducts, setWarehouseProducts] = useState<Product[]>([]);
   const [todayOrders, setTodayOrders] = useState<Order[]>([]);
 
   // Bill Form state
   const [paperBillNumber, setPaperBillNumber] = useState<string>('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [walkInName, setWalkInName] = useState<string>('');
+  const [walkInPhone, setWalkInPhone] = useState<string>('');
   const [billItems, setBillItems] = useState<BillItemRow[]>([{ productId: '', quantity: 1, freeQuantity: 0 }]);
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CREDIT' | 'CHEQUE'>('CASH');
   const [cashReceived, setCashReceived] = useState<string>('');
@@ -55,15 +67,17 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [lorryList, custList, orderList] = await Promise.all([
+      const [lorryList, custList, orderList, prodList] = await Promise.all([
         LorryService.getAll(),
         CustomerService.getAll(),
-        OrderService.getAll(undefined, undefined, undefined, 25)
+        OrderService.getAll(undefined, undefined, undefined, 25),
+        ProductService.getAll()
       ]);
 
       setLorries(lorryList);
       setCustomers(custList);
       setTodayOrders(orderList);
+      setWarehouseProducts(prodList);
 
       if (lorryList.length > 0 && !selectedLorryId) {
         setSelectedLorryId(lorryList[0].id);
@@ -75,13 +89,64 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
     }
   };
 
+  // Handle mode switch
+  const handleModeSwitch = (mode: 'LORRY' | 'WALK_IN') => {
+    setBillMode(mode);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setBillItems([{ productId: '', quantity: 1, freeQuantity: 0 }]);
+    if (mode === 'WALK_IN') {
+      setSelectedCustomerId('walk-in');
+    } else {
+      if (selectedCustomerId === 'walk-in') {
+        setSelectedCustomerId('');
+      }
+    }
+  };
+
   const selectedLorry = lorries.find(l => l.id === selectedLorryId);
   const availableLorryProducts = selectedLorry?.lorryStocks?.filter(s => s.quantity > 0) || [];
-  const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
+  const selectedCustomer = selectedCustomerId !== 'walk-in' ? customers.find(c => c.id === selectedCustomerId) : null;
 
   // Auto-filter customers belonging to this lorry's route first, then rest
   const routeCustomers = customers.filter(c => selectedLorry?.routeId && c.routeId === selectedLorry.routeId);
   const otherCustomers = customers.filter(c => !selectedLorry?.routeId || c.routeId !== selectedLorry.routeId);
+
+  // Available stock items depending on mode
+  interface AvailableItem {
+    id: string;
+    productId: string;
+    name: string;
+    unit: string;
+    unitPrice: number;
+    stock: number;
+    freeRatioBuy?: number;
+    freeRatioGet?: number;
+  }
+
+  const availableItems: AvailableItem[] = billMode === 'LORRY'
+    ? availableLorryProducts.map(s => ({
+        id: s.id,
+        productId: s.productId,
+        name: s.product.name,
+        unit: s.product.unit,
+        unitPrice: s.product.unitPrice,
+        stock: s.quantity,
+        freeRatioBuy: s.product.freeRatioBuy,
+        freeRatioGet: s.product.freeRatioGet
+      }))
+    : warehouseProducts
+        .filter(p => p.currentStock > 0)
+        .map(p => ({
+          id: p.id,
+          productId: p.id,
+          name: p.name,
+          unit: p.unit,
+          unitPrice: p.unitPrice,
+          stock: p.currentStock,
+          freeRatioBuy: p.freeRatioBuy,
+          freeRatioGet: p.freeRatioGet
+        }));
 
   const addItemRow = () => {
     setBillItems([...billItems, { productId: '', quantity: 1, freeQuantity: 0 }]);
@@ -94,9 +159,9 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
     // Auto-calculate free issues if trade scheme exists and productId or quantity changed
     if (field === 'productId' || field === 'quantity') {
       const targetProdId = field === 'productId' ? value : currentRow.productId;
-      const stockItem = availableLorryProducts.find(s => s.productId === targetProdId);
-      const buyRatio = stockItem?.product.freeRatioBuy || 0;
-      const getRatio = stockItem?.product.freeRatioGet || 0;
+      const itemInfo = availableItems.find(s => s.productId === targetProdId);
+      const buyRatio = itemInfo?.freeRatioBuy || 0;
+      const getRatio = itemInfo?.freeRatioGet || 0;
 
       if (buyRatio > 0 && getRatio > 0 && currentRow.quantity > 0) {
         currentRow.freeQuantity = Math.floor(currentRow.quantity / buyRatio) * getRatio;
@@ -120,8 +185,8 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
   // Calculate bill totals
   const calculateSubtotal = () => {
     return billItems.reduce((acc, item) => {
-      const stockItem = availableLorryProducts.find(s => s.productId === item.productId);
-      const price = stockItem ? stockItem.product.unitPrice : 0;
+      const itemInfo = availableItems.find(s => s.productId === item.productId);
+      const price = itemInfo ? itemInfo.unitPrice : 0;
       return acc + (price * (item.quantity || 0));
     }, 0);
   };
@@ -147,8 +212,8 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    if (!selectedLorryId) {
-      setErrorMessage('Please select a lorry.');
+    if (billMode === 'LORRY' && !selectedLorryId) {
+      setErrorMessage('Please select an active lorry.');
       return;
     }
     if (!selectedCustomerId) {
@@ -158,17 +223,17 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
 
     const validItems = billItems.filter(i => i.productId && i.quantity > 0);
     if (validItems.length === 0) {
-      setErrorMessage('Please add at least one line item to the bill.');
+      setErrorMessage('Please add at least one line item with quantity > 0.');
       return;
     }
 
-    // Validate floating lorry stock (paid + free units)
+    // Validate floating lorry stock or central warehouse stock (paid + free units)
     for (const line of validItems) {
-      const stockItem = availableLorryProducts.find(s => s.productId === line.productId);
+      const itemInfo = availableItems.find(s => s.productId === line.productId);
       const totalUnits = (line.quantity || 0) + (line.freeQuantity || 0);
-      if (!stockItem || stockItem.quantity < totalUnits) {
+      if (!itemInfo || itemInfo.stock < totalUnits) {
         setErrorMessage(
-          `Insufficient stock on Lorry ${selectedLorry?.vehicleNumber} for "${stockItem?.product.name || 'Selected Item'}". Only ${stockItem?.quantity || 0} units available, bill requires ${line.quantity} sold + ${line.freeQuantity || 0} free (${totalUnits} total).`
+          `Insufficient ${billMode === 'LORRY' ? `stock on Lorry ${selectedLorry?.vehicleNumber}` : 'Central Warehouse stock'} for "${itemInfo?.name || 'Selected Item'}". Only ${itemInfo?.stock || 0} units available, bill requires ${line.quantity} sold + ${line.freeQuantity || 0} free (${totalUnits} total).`
         );
         return;
       }
@@ -177,29 +242,55 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
     try {
       setSubmitting(true);
       const parsedCash = parseFloat(cashReceived) || 0;
-      const createdOrder = await LorryService.enterDriverBill(selectedLorryId, {
-        paperBillNumber: paperBillNumber.trim() || undefined,
-        customerId: selectedCustomerId,
-        items: validItems.map(i => ({
-          productId: i.productId,
-          quantity: i.quantity,
-          freeQuantity: i.freeQuantity || 0
-        })),
-        paymentMethod,
-        cashReceived: parsedCash,
-        notes: notes.trim() || undefined
-      });
 
-      setSuccessMessage(
-        `Bill #${paperBillNumber || createdOrder.orderNumber} successfully entered for ${createdOrder.customer.name}! (${totalBilledUnits} paid + ${totalFreeUnits} free units deducted from lorry)`
-      );
+      if (billMode === 'LORRY') {
+        const createdOrder = await LorryService.enterDriverBill(selectedLorryId, {
+          paperBillNumber: paperBillNumber.trim() || undefined,
+          customerId: selectedCustomerId,
+          items: validItems.map(i => ({
+            productId: i.productId,
+            quantity: i.quantity,
+            freeQuantity: i.freeQuantity || 0
+          })),
+          paymentMethod,
+          cashReceived: parsedCash,
+          notes: notes.trim() || undefined
+        });
+
+        setSuccessMessage(
+          `Lorry Bill #${paperBillNumber || createdOrder.orderNumber} successfully entered for ${createdOrder.customer.name}! (${totalBilledUnits} paid + ${totalFreeUnits} free units deducted from lorry)`
+        );
+      } else {
+        // WALK_IN mode: deducts directly from warehouse stock
+        const createdOrder = await OrderService.create({
+          customerId: selectedCustomerId,
+          walkInName: walkInName.trim() || undefined,
+          walkInPhone: walkInPhone.trim() || undefined,
+          paperBillNumber: paperBillNumber.trim() || undefined,
+          items: validItems.map(i => ({
+            productId: i.productId,
+            quantity: i.quantity,
+            freeQuantity: i.freeQuantity || 0
+          })),
+          paymentMethod,
+          cashReceived: parsedCash,
+          notes: notes.trim() || undefined
+        });
+
+        const customerDisplayName = walkInName.trim() || (createdOrder.customer ? createdOrder.customer.name : 'Walk-in Customer');
+        setSuccessMessage(
+          `Counter Bill #${paperBillNumber || createdOrder.orderNumber} successfully saved for ${customerDisplayName}! (${totalBilledUnits} paid + ${totalFreeUnits} free units deducted directly from Central Warehouse)`
+        );
+      }
 
       // Reset form
       setPaperBillNumber('');
       setBillItems([{ productId: '', quantity: 1, freeQuantity: 0 }]);
+      setWalkInName('');
+      setWalkInPhone('');
       setNotes('');
 
-      // Refresh list
+      // Refresh list & stocks
       await loadData();
     } catch (err: any) {
       setErrorMessage(err.response?.data?.error || err.message || 'Failed to submit bill.');
@@ -215,22 +306,57 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-blue-600 mb-1">
             <Receipt className="w-4 h-4" />
-            <span>Step 3: Evening Office Bill Entry</span>
+            <span>Billing Operations</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-            Driver Sales Bill Entry
+            Sales Bill Entry
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Office manager inputs paper receipts brought back by drivers. Deducts from lorry floating stock.
+            Issue sales bills for driver lorry deliveries or direct walk-in / counter customers.
           </p>
         </div>
 
         <div className="self-start sm:self-auto flex items-center gap-2 text-xs font-medium bg-white px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl border border-slate-200/80 shadow-2xs">
           <Calendar className="w-4 h-4 text-slate-400" />
           <span className="text-slate-600 font-medium">
-            Evening: {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            Date: {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </span>
         </div>
+      </div>
+
+      {/* Mode Selector Pill Banner */}
+      <div className="bg-slate-100/90 p-1.5 rounded-2xl sm:rounded-3xl flex flex-col sm:flex-row gap-1.5 border border-slate-200/80">
+        <button
+          type="button"
+          onClick={() => handleModeSwitch('LORRY')}
+          className={`flex-1 py-3 px-4 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 transition-all ${
+            billMode === 'LORRY'
+              ? 'bg-white text-blue-600 shadow-xs border border-slate-200/60'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+          }`}
+        >
+          <Truck className="w-4.5 h-4.5 shrink-0" />
+          <div className="text-left">
+            <div className="leading-tight">🚚 Lorry Route Delivery Bill</div>
+            <div className="text-[10px] font-normal text-slate-400">Driver paper slip entry • Deducts from lorry floating stock</div>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleModeSwitch('WALK_IN')}
+          className={`flex-1 py-3 px-4 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 transition-all ${
+            billMode === 'WALK_IN'
+              ? 'bg-white text-emerald-600 shadow-xs border border-slate-200/60'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+          }`}
+        >
+          <Building2 className="w-4.5 h-4.5 shrink-0" />
+          <div className="text-left">
+            <div className="leading-tight">🏢 Walk-in / Counter Direct Sale</div>
+            <div className="text-[10px] font-normal text-slate-400">Warehouse direct desk sale • Deducts directly from central warehouse</div>
+          </div>
+        </button>
       </div>
 
       {/* Notifications */}
@@ -248,42 +374,60 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
         </div>
       )}
 
-      {/* Lorry Selector Bar */}
-      <div className="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <Truck className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-              Active Driver Lorry
-            </span>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-sm font-bold text-slate-900">{selectedLorry?.vehicleNumber}</span>
-              <span className="text-xs text-slate-500">• {selectedLorry?.driverName}</span>
-              <span className="text-xs text-blue-600 font-semibold truncate">({selectedLorry?.route?.name})</span>
+      {/* Lorry Selector Bar (Only in Lorry Mode) */}
+      {billMode === 'LORRY' ? (
+        <div className="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <Truck className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+                Active Driver Lorry
+              </span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-sm font-bold text-slate-900">{selectedLorry?.vehicleNumber}</span>
+                <span className="text-xs text-slate-500">• {selectedLorry?.driverName}</span>
+                <span className="text-xs text-blue-600 font-semibold truncate">({selectedLorry?.route?.name || 'No Route'})</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0">
-          {lorries.map((lorry) => {
-            const isSelected = lorry.id === selectedLorryId;
-            return (
-              <button
-                key={lorry.id}
-                onClick={() => setSelectedLorryId(lorry.id)}
-                className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap flex-1 sm:flex-initial text-center ${isSelected
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0">
+            {lorries.map((lorry) => {
+              const isSelected = lorry.id === selectedLorryId;
+              return (
+                <button
+                  key={lorry.id}
+                  onClick={() => setSelectedLorryId(lorry.id)}
+                  className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap flex-1 sm:flex-initial text-center ${
+                    isSelected
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
-              >
-                {lorry.vehicleNumber}
-              </button>
-            );
-          })}
+                >
+                  {lorry.vehicleNumber}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      ) : (
+        /* Walk-in Counter Notice Banner */
+        <div className="bg-emerald-50/70 p-3.5 sm:p-4 rounded-3xl border border-emerald-200/80 shadow-2xs flex items-center gap-3">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+            <Building2 className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider block">
+              Direct Warehouse Sales Counter
+            </span>
+            <p className="text-xs text-emerald-700">
+              Items billed here are issued on-the-spot and deducted directly from the Central Warehouse stock (no lorry loading required).
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Bill Entry Workspace */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -291,15 +435,19 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
         <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200/80 shadow-2xs p-6 space-y-5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div className="flex items-center gap-2">
-              <FileText className="w-4.5 h-4.5 text-blue-600" />
+              <FileText className={`w-4.5 h-4.5 ${billMode === 'LORRY' ? 'text-blue-600' : 'text-emerald-600'}`} />
               <h2 className="text-sm sm:text-base font-bold text-slate-900 uppercase tracking-wider">
-                Paper Bill Slip Details
+                {billMode === 'LORRY' ? 'Paper Bill Slip Details' : 'Walk-in Counter Sale Details'}
               </h2>
             </div>
             <button
               type="button"
               onClick={addItemRow}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors"
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-xl transition-colors ${
+                billMode === 'LORRY'
+                  ? 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+                  : 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+              }`}
             >
               <Plus className="w-4 h-4" /> Add Item Line
             </button>
@@ -310,20 +458,20 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
-                  Driver's Physical Paper Bill # (Slip / Invoice No)
+                  {billMode === 'LORRY' ? "Driver's Paper Bill # (Slip / Invoice No)" : 'Office / Counter Receipt # (Optional)'}
                 </label>
                 <input
                   type="text"
                   value={paperBillNumber}
                   onChange={(e) => setPaperBillNumber(e.target.value)}
-                  placeholder="e.g. SLIP-1082 or B-492"
+                  placeholder={billMode === 'LORRY' ? 'e.g. SLIP-1082 or B-492' : 'e.g. COUNTER-101 (or leave blank)'}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
-                  Retail Customer / Outlet *
+                  {billMode === 'LORRY' ? 'Retail Customer / Outlet *' : 'Customer Account *'}
                 </label>
                 <select
                   value={selectedCustomerId}
@@ -331,45 +479,92 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
                   required
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="">-- Choose Retail Customer --</option>
-                  {routeCustomers.length > 0 && (
-                    <optgroup label={`Route Customers (${selectedLorry?.route?.name || 'Route'})`}>
-                      {routeCustomers.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.code} - {c.name} {c.discountPercentage > 0 ? `(${c.discountPercentage}% Disc)` : ''}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                  {otherCustomers.length > 0 && (
-                    <optgroup label="Other Customers">
-                      {otherCustomers.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.code} - {c.name}
-                        </option>
-                      ))}
-                    </optgroup>
+                  {billMode === 'WALK_IN' ? (
+                    <>
+                      <option value="walk-in">⚡ Walk-in / Cash Customer (Direct Counter)</option>
+                      <optgroup label="Registered Account Holders (Visiting Counter)">
+                        {customers.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.code} - {c.name} {c.discountPercentage > 0 ? `(${c.discountPercentage}% Disc)` : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                    </>
+                  ) : (
+                    <>
+                      <option value="">-- Choose Retail Customer --</option>
+                      {routeCustomers.length > 0 && (
+                        <optgroup label={`Route Customers (${selectedLorry?.route?.name || 'Route'})`}>
+                          {routeCustomers.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.code} - {c.name} {c.discountPercentage > 0 ? `(${c.discountPercentage}% Disc)` : ''}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {otherCustomers.length > 0 && (
+                        <optgroup label="Other Customers">
+                          {otherCustomers.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.code} - {c.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </>
                   )}
                 </select>
               </div>
             </div>
 
+            {/* Walk-in Customer Optional Quick Name / Phone */}
+            {billMode === 'WALK_IN' && selectedCustomerId === 'walk-in' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-emerald-50/50 border border-emerald-100 rounded-2xl">
+                <div>
+                  <label className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">
+                    Walk-in Customer Name (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={walkInName}
+                    onChange={(e) => setWalkInName(e.target.value)}
+                    placeholder="e.g. Kasun Silva or City Stores"
+                    className="w-full bg-white border border-emerald-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">
+                    Contact Phone (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={walkInPhone}
+                    onChange={(e) => setWalkInPhone(e.target.value)}
+                    placeholder="e.g. 077 123 4567"
+                    className="w-full bg-white border border-emerald-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Bill Line Items Table */}
             <div className="space-y-2 pt-2">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-                Items Sold From Lorry Stock
+                {billMode === 'LORRY' ? 'Items Sold From Lorry Stock' : 'Items Sold From Central Warehouse Stock'}
               </span>
 
-              {availableLorryProducts.length === 0 ? (
+              {availableItems.length === 0 ? (
                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs sm:text-sm text-amber-800">
-                  ⚠️ This lorry has no floating stock loaded. Please perform a <strong>Morning Lorry Loading</strong> first.
+                  {billMode === 'LORRY'
+                    ? '⚠️ This lorry has no floating stock loaded. Please perform a Morning Lorry Loading first.'
+                    : '⚠️ Central Warehouse has 0 items in stock.'}
                 </div>
               ) : (
                 billItems.map((item, index) => {
-                  const stockItem = availableLorryProducts.find(s => s.productId === item.productId);
-                  const price = stockItem ? stockItem.product.unitPrice : 0;
+                  const itemInfo = availableItems.find(s => s.productId === item.productId);
+                  const price = itemInfo ? itemInfo.unitPrice : 0;
                   const lineTotal = price * (item.quantity || 0);
-                  const hasScheme = stockItem && stockItem.product.freeRatioBuy && stockItem.product.freeRatioBuy > 0 && stockItem.product.freeRatioGet;
+                  const hasScheme = itemInfo && itemInfo.freeRatioBuy && itemInfo.freeRatioBuy > 0 && itemInfo.freeRatioGet;
 
                   return (
                     <div
@@ -384,13 +579,15 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
                           required
                           className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
-                          <option value="">-- Select Item on Lorry --</option>
-                          {availableLorryProducts.map((s) => (
+                          <option value="">
+                            {billMode === 'LORRY' ? '-- Select Item on Lorry --' : '-- Select Item in Warehouse --'}
+                          </option>
+                          {availableItems.map((s) => (
                             <option key={s.productId} value={s.productId}>
-                              {s.product.name} (Lorry Stock: {s.quantity} {s.product.unit})
-                              {s.product.freeRatioBuy && s.product.freeRatioBuy > 0 && s.product.freeRatioGet
-                                ? ` ★ Promo: Buy ${s.product.freeRatioBuy} get ${s.product.freeRatioGet} Free`
-                                : ''} - {formatMoney(s.product.unitPrice)}
+                              {s.name} ({billMode === 'LORRY' ? 'Lorry' : 'Warehouse'}: {s.stock} {s.unit})
+                              {s.freeRatioBuy && s.freeRatioBuy > 0 && s.freeRatioGet
+                                ? ` ★ Promo: Buy ${s.freeRatioBuy} get ${s.freeRatioGet} Free`
+                                : ''} - {formatMoney(s.unitPrice)}
                             </option>
                           ))}
                         </select>
@@ -403,7 +600,7 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
                           <input
                             type="number"
                             min="1"
-                            max={stockItem ? stockItem.quantity : 9999}
+                            max={itemInfo ? itemInfo.stock : 9999}
                             value={item.quantity || ''}
                             onChange={(e) => updateItemRow(index, 'quantity', parseInt(e.target.value, 10) || 0)}
                             placeholder="Paid Qty"
@@ -418,7 +615,7 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
                           <input
                             type="number"
                             min="0"
-                            max={stockItem ? stockItem.quantity : 9999}
+                            max={itemInfo ? itemInfo.stock : 9999}
                             value={item.freeQuantity !== undefined ? item.freeQuantity : ''}
                             onChange={(e) => updateItemRow(index, 'freeQuantity', parseInt(e.target.value, 10) || 0)}
                             placeholder="0 Free"
@@ -499,7 +696,7 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
                   type="text"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Optional driver remarks, shop manager signature note..."
+                  placeholder="Optional remarks, customer notes, receipt reference..."
                   className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -546,48 +743,76 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
 
               <button
                 type="submit"
-                disabled={submitting || availableLorryProducts.length === 0}
-                className="w-full sm:w-auto px-6 py-3.5 bg-[#0071E3] hover:bg-blue-600 active:scale-[0.99] text-white text-sm font-bold rounded-2xl shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                disabled={submitting || availableItems.length === 0}
+                className={`w-full sm:w-auto px-6 py-3.5 active:scale-[0.99] text-white text-sm font-bold rounded-2xl shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 ${
+                  billMode === 'LORRY'
+                    ? 'bg-[#0071E3] hover:bg-blue-600'
+                    : 'bg-emerald-600 hover:bg-emerald-700'
+                }`}
               >
                 <Receipt className="w-4 h-4" />
-                <span>{submitting ? 'Saving Bill...' : 'Save & Record Bill'}</span>
+                <span>
+                  {submitting
+                    ? 'Saving Bill...'
+                    : billMode === 'LORRY'
+                      ? 'Save Lorry Delivery Bill'
+                      : 'Save Walk-in Bill'}
+                </span>
               </button>
             </div>
           </form>
         </div>
 
-        {/* Lorry Floating Stock Overview (1 Col) */}
+        {/* Right-Side Stock Overview (1 Col) */}
         <div className="space-y-4">
           <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs p-5 space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                <Truck className="w-4 h-4 text-blue-600" />
-                Stock Left in {selectedLorry?.vehicleNumber}
+                {billMode === 'LORRY' ? (
+                  <>
+                    <Truck className="w-4 h-4 text-blue-600" />
+                    Stock Left in {selectedLorry?.vehicleNumber || 'Lorry'}
+                  </>
+                ) : (
+                  <>
+                    <Building2 className="w-4 h-4 text-emerald-600" />
+                    Central Warehouse Stock
+                  </>
+                )}
               </h3>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                {availableLorryProducts.length} Items
+                {availableItems.length} Items Available
               </span>
             </div>
 
-            <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
-              {availableLorryProducts.length > 0 ? (
-                availableLorryProducts.map((stock) => (
+            <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
+              {availableItems.length > 0 ? (
+                availableItems.map((item) => (
                   <div
-                    key={stock.id}
-                    className="flex items-center justify-between py-2 px-3 bg-slate-50 rounded-xl text-xs"
+                    key={item.id}
+                    className="flex items-center justify-between py-2 px-3 bg-slate-50 rounded-xl text-xs hover:bg-slate-100/70 transition-colors"
                   >
-                    <div>
-                      <span className="font-medium text-slate-800 block">{stock.product.name}</span>
-                      <span className="font-mono text-[10px] text-slate-400">{formatMoney(stock.product.unitPrice)}</span>
+                    <div className="pr-2">
+                      <span className="font-medium text-slate-800 block truncate max-w-[140px] sm:max-w-[180px]">
+                        {item.name}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-[10px] text-slate-400">{formatMoney(item.unitPrice)}</span>
+                        {item.freeRatioBuy && item.freeRatioBuy > 0 && item.freeRatioGet ? (
+                          <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded">
+                            Buy {item.freeRatioBuy}+{item.freeRatioGet}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
-                    <span className="font-mono font-bold text-slate-900 px-2 py-0.5 bg-white border border-slate-200 rounded-lg">
-                      {stock.quantity} {stock.product.unit}
+                    <span className="font-mono font-bold text-slate-900 px-2 py-0.5 bg-white border border-slate-200 rounded-lg shrink-0">
+                      {item.stock} {item.unit}
                     </span>
                   </div>
                 ))
               ) : (
                 <div className="text-center py-8 text-xs text-slate-400">
-                  Lorry has 0 items remaining.
+                  {billMode === 'LORRY' ? 'Lorry has 0 items remaining.' : 'Warehouse has 0 items in stock.'}
                 </div>
               )}
             </div>
@@ -600,10 +825,10 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div>
             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-              Recent Driver Bills Recorded
+              Recent Bills Recorded
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Bills brought by drivers and saved in the system today.
+              Bills brought by drivers and direct counter sales saved in the system today.
             </p>
           </div>
         </div>
@@ -613,9 +838,9 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
             <thead>
               <tr className="border-b border-slate-100 text-xs font-bold text-slate-500 uppercase tracking-wider">
                 <th className="py-3 px-3.5">System Bill #</th>
-                <th className="py-3 px-3.5">Paper Slip #</th>
-                <th className="py-3 px-3.5">Lorry / Driver</th>
-                <th className="py-3 px-3.5">Retail Customer</th>
+                <th className="py-3 px-3.5">Paper / Receipt #</th>
+                <th className="py-3 px-3.5">Channel / Source</th>
+                <th className="py-3 px-3.5">Customer</th>
                 <th className="py-3 px-3.5">Payment</th>
                 <th className="py-3 px-3.5 text-right">Net Total</th>
                 <th className="py-3 px-3.5 text-right">Cash Received</th>
@@ -633,24 +858,29 @@ export const BillEntry: React.FC<BillEntryProps> = ({ onViewInvoice }) => {
                   </td>
                   <td className="py-3.5 px-3.5 text-slate-700">
                     {order.lorry ? (
-                      <span className="font-medium">
+                      <span className="inline-flex items-center gap-1.5 font-medium text-slate-800">
+                        <Truck className="w-3.5 h-3.5 text-blue-500" />
                         {order.lorry.vehicleNumber} ({order.lorry.driverName.split(' ')[0]})
                       </span>
                     ) : (
-                      <span className="text-slate-400">Warehouse Counter</span>
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                        <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+                        Warehouse Counter
+                      </span>
                     )}
                   </td>
                   <td className="py-3.5 px-3.5 font-semibold text-slate-900">
-                    {order.customer.name}
+                    {order.customer?.name || 'Walk-in Customer'}
                   </td>
                   <td className="py-3.5 px-3.5">
                     <span
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase ${order.paymentStatus === 'PAID'
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase ${
+                        order.paymentStatus === 'PAID'
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
                           : order.paymentStatus === 'PARTIAL'
                             ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
                             : 'bg-rose-50 text-rose-700 border border-rose-200/60'
-                        }`}
+                      }`}
                     >
                       {order.paymentMethod} • {order.paymentStatus}
                     </span>
