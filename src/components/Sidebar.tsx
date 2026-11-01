@@ -16,15 +16,19 @@ import {
   Building2,
   Factory,
   Smartphone,
+  LogOut,
   X
 } from 'lucide-react';
 import { useCurrency, CURRENCIES, CurrencyCode } from '../context/CurrencyContext';
+import { User } from '../types';
 
 interface SidebarProps {
   currentTab: string;
   onTabChange: (tab: string) => void;
   isOpen?: boolean;
   onClose?: () => void;
+  currentUser?: User | null;
+  onLogout?: () => void;
 }
 
 interface SidebarSection {
@@ -42,7 +46,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentTab,
   onTabChange,
   isOpen = false,
-  onClose
+  onClose,
+  currentUser,
+  onLogout
 }) => {
   const { currency, setCurrency } = useCurrency();
 
@@ -60,7 +66,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'suppliers', label: 'Suppliers', icon: Building2, badge: 'Stock In', badgeTone: 'inward' },
         { id: 'manufacturing', label: 'Manufacturing & BOM', icon: Factory, badge: 'Production', badgeTone: 'inward' },
         { id: 'lorry-loading', label: 'Morning Lorry Load', icon: Truck, badge: 'Step 2', badgeTone: 'step' },
-        { id: 'rep-billing', label: 'Rep Route Billing', icon: Smartphone, badge: '5-Step', badgeTone: 'pnl' },
         { id: 'bill-entry', label: 'Office Bill Entry', icon: Receipt, badge: 'Step 3', badgeTone: 'step' },
         { id: 'lorry-settlement', label: 'Day Settlement', icon: RotateCcw, badge: 'Step 4', badgeTone: 'step' }
       ]
@@ -235,6 +240,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
           </div>
         </div>
+
+        {/* Admin User Profile & Logout */}
+        {onLogout && (
+          <div className="pt-2.5 mt-2 border-t border-slate-200/80 flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                A
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-slate-800 truncate">
+                  {currentUser?.fullName || 'Administrator'}
+                </p>
+                <p className="text-[10px] text-slate-400 font-medium truncate">
+                  Admin Backoffice
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onLogout}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+              title="Sign Out to Login Screen"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

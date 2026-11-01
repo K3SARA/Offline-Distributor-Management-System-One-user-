@@ -23,15 +23,41 @@ import { Suppliers } from './pages/Suppliers';
 import { Expenses } from './pages/Expenses';
 import { Settings } from './pages/Settings';
 import { Manufacturing } from './pages/Manufacturing';
+import { Login } from './pages/Login';
+import { RepMobilePortal } from './pages/RepMobilePortal';
 import { InvoiceModal } from './components/InvoiceModal';
 import { CurrencyProvider, useCurrency, CURRENCIES } from './context/CurrencyContext';
-import { Order } from './types';
+import { Order, User } from './types';
 
 export const AppContent: React.FC = () => {
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+      const saved = localStorage.getItem('distributor_auth_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState<boolean>(false);
   const [activeInvoiceOrder, setActiveInvoiceOrder] = useState<Order | null>(null);
   const { currency } = useCurrency();
+
+  const handleLogout = () => {
+    localStorage.removeItem('distributor_auth_user');
+    setCurrentUser(null);
+  };
+
+  // 1. Unauthenticated: Render dedicated Login Page
+  if (!currentUser) {
+    return <Login onLoginSuccess={setCurrentUser} />;
+  }
+
+  // 2. Route Sales Rep: Render dedicated Mobile Rep Portal (Separate from desktop)
+  if (currentUser.role === 'REP') {
+    return <RepMobilePortal user={currentUser} onLogout={handleLogout} />;
+  }
 
   const bottomNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -57,6 +83,8 @@ export const AppContent: React.FC = () => {
         onTabChange={setCurrentTab}
         isOpen={isMobileDrawerOpen}
         onClose={() => setIsMobileDrawerOpen(false)}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       {/* Main Work Area */}

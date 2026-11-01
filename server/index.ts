@@ -24,6 +24,168 @@ app.get('/api/health', (req, res) => {
 });
 
 // ========================================================
+// 0. AUTHENTICATION & USER MANAGEMENT (ADMIN & ROUTE REPS)
+// ========================================================
+
+// Login endpoint (separates Admin vs Rep by role)
+app.post('/api/auth/login', async (req: Request, res: Response) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+
+    const cleanUsername = String(username).trim();
+    const cleanPassword = String(password).trim();
+
+    const user = await prisma.user.findFirst({
+      where: {
+        username: { equals: cleanUsername },
+        status: 'ACTIVE'
+      },
+      include: {
+        lorry: {
+          include: {
+            route: true
+          }
+        }
+      }
+    });
+
+    if (!user || user.password !== cleanPassword) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    return res.json({
+      user: {
+        id: user.id,
+        username: user.username,
+        fullName: user.fullName,
+        role: user.role, // 'ADMIN' | 'REP'
+        phone: user.phone,
+        lorryId: user.lorryId,
+        lorry: user.lorry ? {
+          id: user.lorry.id,
+          vehicleNumber: user.lorry.vehicleNumber,
+          driverName: user.lorry.driverName,
+          routeId: user.lorry.routeId,
+          routeName: user.lorry.route?.name || 'Assigned Route',
+          routeCode: user.lorry.route?.code || ''
+        } : null
+      }
+    });
+  } catch (err: any) {
+    console.error('[API Auth] Login error:', err);
+    return res.status(500).json({ error: 'Authentication failed' });
+  }
+});
+
+// List users (for admin management)
+app.get('/api/users', async (req: Request, res: Response) => {
+  try {
+    const users = await prisma.user.findMany({
+      include: {
+        lorry: {
+          include: {
+            route: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+    return res.json(users);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Create new user (admin adds reps or admins)
+app.post('/api/users', async (req: Request, res: Response) => {
+  try {
+    const { username, password, fullName, role, phone, lorryId } = req.body;
+    if (!username || !password || !fullName) {
+      return res.status(400).json({ error: 'Username, password and full name required' });
+    }
+
+    const existing = await prisma.user.findUnique({
+      where: { username: String(username).trim() }
+    });
+    if (existing) {
+      return res.status(400).json({ error: 'Username already taken' });
+    }
+
+    const user = await prisma.user.create({
+      data: {
+        username: String(username).trim(),
+        password: String(password).trim(),
+        fullName: String(fullName).trim(),
+        role: role === 'ADMIN' ? 'ADMIN' : 'REP',
+        phone: phone ? String(phone).trim() : null,
+        lorryId: lorryId || null,
+        status: 'ACTIVE'
+      },
+      include: {
+        lorry: {
+          include: {
+            route: true
+          }
+        }
+      }
+    });
+
+    return res.status(201).json(user);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Update user / reset password
+app.put('/api/users/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { password, fullName, role, phone, lorryId, status } = req.body;
+
+    const data: any = {};
+    if (password) data.password = String(password).trim();
+    if (fullName) data.fullName = String(fullName).trim();
+    if (role) data.role = role === 'ADMIN' ? 'ADMIN' : 'REP';
+    if (phone !== undefined) data.phone = phone ? String(phone).trim() : null;
+    if (lorryId !== undefined) data.lorryId = lorryId || null;
+    if (status) data.status = status;
+
+    const updated = await prisma.user.update({
+      where: { id },
+      data,
+      include: {
+        lorry: {
+          include: {
+            route: true
+          }
+        }
+      }
+    });
+
+    return res.json(updated);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Deactivate user
+app.delete('/api/users/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await prisma.user.update({
+      where: { id },
+      data: { status: 'INACTIVE' }
+    });
+    return res.json({ success: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ========================================================
 // 1. INVENTORY & WAREHOUSE MANAGEMENT
 // ========================================================
 
@@ -3925,6 +4087,52 @@ async function seedIfEmpty() {
           }
         ]
       });
+    }
+
+    // 9. Ensure Default Users exist (Admin & 3 Route Reps)
+    const userCount = await prisma.user.count();
+    if (userCount === 0) {
+      console.log('[Auto-Seed] Seeding default Admin & 3 Route Rep users...');
+      const allLorries = await prisma.lorry.findMany({ orderBy: { vehicleNumber: 'asc' } });
+      const lorry1 = allLorries[0];
+      const lorry2 = allLorries[1];
+      const lorry3 = allLorries[2];
+
+      await prisma.user.createMany({
+        data: [
+          {
+            username: 'admin',
+            password: 'admin123',
+            fullName: 'Main Administrator',
+            role: 'ADMIN'
+          },
+          {
+            username: 'rep1',
+            password: 'rep123',
+            fullName: lorry1?.driverName ? `${lorry1.driverName} (Rep 1)` : 'Sunil Perera (Rep 1)',
+            role: 'REP',
+            lorryId: lorry1?.id || null,
+            phone: lorry1?.driverPhone || '+94 77 123 4501'
+          },
+          {
+            username: 'rep2',
+            password: 'rep123',
+            fullName: lorry2?.driverName ? `${lorry2.driverName} (Rep 2)` : 'Kamal Silva (Rep 2)',
+            role: 'REP',
+            lorryId: lorry2?.id || null,
+            phone: lorry2?.driverPhone || '+94 71 876 5402'
+          },
+          {
+            username: 'rep3',
+            password: 'rep123',
+            fullName: lorry3?.driverName ? `${lorry3.driverName} (Rep 3)` : 'Nimal Fernando (Rep 3)',
+            role: 'REP',
+            lorryId: lorry3?.id || null,
+            phone: lorry3?.driverPhone || '+94 78 554 3203'
+          }
+        ]
+      });
+      console.log('[Auto-Seed] Admin & Rep credentials seeded: admin/admin123, rep1/rep123, rep2/rep123, rep3/rep123');
     }
 
     console.log('[Auto-Seed] System initial data ready.');

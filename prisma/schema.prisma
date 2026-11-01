@@ -82,6 +82,7 @@ model Lorry {
   orders           Order[]
   expenses         Expense[]
   customerPayments CustomerPayment[]
+  users            User[]
 }
 
 // Real-time floating inventory held on each lorry
@@ -382,4 +383,21 @@ model ProductionRunItem {
   actualQuantity  Float
   unitCost        Float
   lineCost        Float
+}
+
+// --------------------------------------------------------
+// 9. AUTH & USERS (ADMIN & MOBILE ROUTE REPS)
+// --------------------------------------------------------
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  fullName  String
+  role      String   @default("REP") // "ADMIN" | "REP"
+  phone     String?
+  lorryId   String?
+  lorry     Lorry?   @relation(fields: [lorryId], references: [id])
+  status    String   @default("ACTIVE") // "ACTIVE" | "INACTIVE"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

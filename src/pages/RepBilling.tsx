@@ -47,9 +47,10 @@ interface CartItem {
 interface RepBillingProps {
   onViewInvoice?: (order: Order) => void;
   onExitToMenu?: () => void;
+  initialLorryId?: string;
 }
 
-export const RepBilling: React.FC<RepBillingProps> = ({ onViewInvoice, onExitToMenu }) => {
+export const RepBilling: React.FC<RepBillingProps> = ({ onViewInvoice, onExitToMenu, initialLorryId }) => {
   const { formatMoney, currencyConfig } = useCurrency();
 
   // Current Active Step: 1 | 2 | 3 | 4 | 5
@@ -59,7 +60,7 @@ export const RepBilling: React.FC<RepBillingProps> = ({ onViewInvoice, onExitToM
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [lorries, setLorries] = useState<Lorry[]>([]);
-  const [selectedLorryId, setSelectedLorryId] = useState<string>('');
+  const [selectedLorryId, setSelectedLorryId] = useState<string>(initialLorryId || '');
   const [loading, setLoading] = useState<boolean>(true);
 
   // Step 1 State: Customer & Billing Method
@@ -110,7 +111,9 @@ export const RepBilling: React.FC<RepBillingProps> = ({ onViewInvoice, onExitToM
       setProducts(finishedGoods);
       setLorries(lorryList);
 
-      if (lorryList.length > 0 && !selectedLorryId) {
+      if (initialLorryId && lorryList.some(l => l.id === initialLorryId)) {
+        setSelectedLorryId(initialLorryId);
+      } else if (lorryList.length > 0 && !selectedLorryId) {
         setSelectedLorryId(lorryList[0].id);
       }
     } catch (err) {

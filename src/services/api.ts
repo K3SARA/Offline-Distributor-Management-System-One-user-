@@ -18,7 +18,8 @@ import {
   Recipe,
   ProductionRun,
   ManufacturingSummary,
-  LorryPerformanceReport
+  LorryPerformanceReport,
+  User
 } from '../types';
 
 // Dynamic API URL: uses relative '/api' on Railway / production web,
@@ -266,5 +267,18 @@ export const ManufacturingService = {
     api.post<ProductionRun>(`/manufacturing/production-runs/${id}/cancel`).then(r => r.data),
   getSummary: () =>
     api.get<ManufacturingSummary>('/manufacturing/summary').then(r => r.data)
+};
+
+export const AuthService = {
+  login: (credentials: { username: string; password: string }) =>
+    api.post<{ user: User }>('/auth/login', credentials).then(r => r.data),
+  getUsers: () =>
+    api.get<User[]>('/users').then(r => r.data),
+  createUser: (data: { username: string; password: string; fullName: string; role?: 'ADMIN' | 'REP'; phone?: string; lorryId?: string }) =>
+    api.post<User>('/users', data).then(r => r.data),
+  updateUser: (id: string, data: Partial<User> & { password?: string }) =>
+    api.put<User>(`/users/${id}`, data).then(r => r.data),
+  deleteUser: (id: string) =>
+    api.delete<{ success: boolean }>(`/users/${id}`).then(r => r.data)
 };
 

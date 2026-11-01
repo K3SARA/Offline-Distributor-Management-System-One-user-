@@ -508,3 +508,21 @@ export interface LorryPerformanceReport {
     totalCreditSale: number;
   })[];
 }
+
+export interface User {
+  id: string;
+  username: string;
+  fullName: string;
+  role: 'ADMIN' | 'REP';
+  phone?: string | null;
+  lorryId?: string | null;
+  lorry?: {
+    id: string;
+    vehicleNumber: string;
+    driverName: string;
+    routeId?: string | null;
+    routeName?: string | null;
+    routeCode?: string | null;
+  } | null;
+  status: 'ACTIVE' | 'INACTIVE';
+}
