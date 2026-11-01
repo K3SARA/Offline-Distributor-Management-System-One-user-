@@ -389,15 +389,18 @@ model ProductionRunItem {
 // 9. AUTH & USERS (ADMIN & MOBILE ROUTE REPS)
 // --------------------------------------------------------
 model User {
-  id        String   @id @default(uuid())
-  username  String   @unique
-  password  String
-  fullName  String
-  role      String   @default("REP") // "ADMIN" | "REP"
-  phone     String?
-  lorryId   String?
-  lorry     Lorry?   @relation(fields: [lorryId], references: [id])
-  status    String   @default("ACTIVE") // "ACTIVE" | "INACTIVE"
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String   @id @default(uuid())
+  username         String   @unique
+  password         String
+  fullName         String
+  role             String   @default("REP") // "ADMIN" | "REP"
+  phone            String?
+  lorryId          String?
+  lorry            Lorry?   @relation(fields: [lorryId], references: [id])
+  status           String   @default("ACTIVE") // "ACTIVE" | "INACTIVE"
+  monthlyTarget    Float    @default(0.0) // Monthly revenue target amount
+  dailyTarget      Float    @default(0.0) // Daily revenue target amount
+  targetNewClients Int      @default(0)   // Monthly new shops onboarding target
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }

@@ -275,8 +275,17 @@ export const AuthService = {
     api.post<{ user: User }>('/auth/login', credentials).then(r => r.data),
   getUsers: () =>
     api.get<User[]>('/users').then(r => r.data),
-  createUser: (data: { username: string; password: string; fullName: string; role?: 'ADMIN' | 'REP'; phone?: string; lorryId?: string }) =>
-    api.post<User>('/users', data).then(r => r.data),
+  createUser: (data: {
+    username: string;
+    password: string;
+    fullName: string;
+    role?: 'ADMIN' | 'REP';
+    phone?: string;
+    lorryId?: string;
+    monthlyTarget?: number;
+    dailyTarget?: number;
+    targetNewClients?: number;
+  }) => api.post<User>('/users', data).then(r => r.data),
   updateUser: (id: string, data: Partial<User> & { password?: string }) =>
     api.put<User>(`/users/${id}`, data).then(r => r.data),
   deleteUser: (id: string) =>

@@ -81,7 +81,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
   }
 });
 
-// List users (for admin management)
+// List users (for admin management) with performance targets & progress
 app.get('/api/users', async (req: Request, res: Response) => {
   try {
     const users = await prisma.user.findMany({
@@ -94,16 +94,47 @@ app.get('/api/users', async (req: Request, res: Response) => {
       },
       orderBy: { createdAt: 'asc' }
     });
-    return res.json(users);
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Compute month-to-date sales progress for sales reps
+    const enhancedUsers = await Promise.all(
+      users.map(async (u) => {
+        let actualSalesThisMonth = 0;
+        if (u.role === 'REP' && u.lorryId) {
+          const salesAgg = await prisma.order.aggregate({
+            _sum: { netTotal: true },
+            where: {
+              lorryId: u.lorryId,
+              createdAt: { gte: startOfMonth }
+            }
+          });
+          actualSalesThisMonth = salesAgg._sum.netTotal || 0;
+        }
+
+        const monthlyTarget = u.monthlyTarget || 0;
+        const achievementPercentage =
+          monthlyTarget > 0 ? Math.round((actualSalesThisMonth / monthlyTarget) * 100) : 0;
+
+        return {
+          ...u,
+          actualSalesThisMonth,
+          achievementPercentage
+        };
+      })
+    );
+
+    return res.json(enhancedUsers);
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 });
 
-// Create new user (admin adds reps or admins)
+// Create new user (admin adds reps or admins with targets)
 app.post('/api/users', async (req: Request, res: Response) => {
   try {
-    const { username, password, fullName, role, phone, lorryId } = req.body;
+    const { username, password, fullName, role, phone, lorryId, monthlyTarget, dailyTarget, targetNewClients } = req.body;
     if (!username || !password || !fullName) {
       return res.status(400).json({ error: 'Username, password and full name required' });
     }
@@ -123,7 +154,10 @@ app.post('/api/users', async (req: Request, res: Response) => {
         role: role === 'ADMIN' ? 'ADMIN' : 'REP',
         phone: phone ? String(phone).trim() : null,
         lorryId: lorryId || null,
-        status: 'ACTIVE'
+        status: 'ACTIVE',
+        monthlyTarget: monthlyTarget ? Number(monthlyTarget) : 0,
+        dailyTarget: dailyTarget ? Number(dailyTarget) : 0,
+        targetNewClients: targetNewClients ? Number(targetNewClients) : 0
       },
       include: {
         lorry: {
@@ -140,11 +174,11 @@ app.post('/api/users', async (req: Request, res: Response) => {
   }
 });
 
-// Update user / reset password
+// Update user / reset password / update sales targets
 app.put('/api/users/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { password, fullName, role, phone, lorryId, status } = req.body;
+    const { password, fullName, role, phone, lorryId, status, monthlyTarget, dailyTarget, targetNewClients } = req.body;
 
     const data: any = {};
     if (password) data.password = String(password).trim();
@@ -153,6 +187,9 @@ app.put('/api/users/:id', async (req: Request, res: Response) => {
     if (phone !== undefined) data.phone = phone ? String(phone).trim() : null;
     if (lorryId !== undefined) data.lorryId = lorryId || null;
     if (status) data.status = status;
+    if (monthlyTarget !== undefined) data.monthlyTarget = Number(monthlyTarget) || 0;
+    if (dailyTarget !== undefined) data.dailyTarget = Number(dailyTarget) || 0;
+    if (targetNewClients !== undefined) data.targetNewClients = Number(targetNewClients) || 0;
 
     const updated = await prisma.user.update({
       where: { id },
@@ -172,14 +209,24 @@ app.put('/api/users/:id', async (req: Request, res: Response) => {
   }
 });
 
-// Deactivate user
+// Delete or deactivate user
 app.delete('/api/users/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    await prisma.user.update({
-      where: { id },
-      data: { status: 'INACTIVE' }
-    });
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      return res.json({ success: true, message: 'User already removed or does not exist' });
+    }
+
+    try {
+      await prisma.user.delete({ where: { id } });
+    } catch {
+      await prisma.user.update({
+        where: { id },
+        data: { status: 'INACTIVE', lorryId: null }
+      });
+    }
+
     return res.json({ success: true });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
@@ -347,7 +394,10 @@ app.post('/api/backup/import', async (req: Request, res: Response) => {
           role: u.role || 'REP',
           phone: u.phone || null,
           lorryId: u.lorryId || null,
-          status: u.status || 'ACTIVE'
+          status: u.status || 'ACTIVE',
+          monthlyTarget: Number(u.monthlyTarget) || 0,
+          dailyTarget: Number(u.dailyTarget) || 0,
+          targetNewClients: Number(u.targetNewClients) || 0
         },
         create: {
           id: u.id,
@@ -357,7 +407,10 @@ app.post('/api/backup/import', async (req: Request, res: Response) => {
           role: u.role || 'REP',
           phone: u.phone || null,
           lorryId: u.lorryId || null,
-          status: u.status || 'ACTIVE'
+          status: u.status || 'ACTIVE',
+          monthlyTarget: Number(u.monthlyTarget) || 0,
+          dailyTarget: Number(u.dailyTarget) || 0,
+          targetNewClients: Number(u.targetNewClients) || 0
         }
       });
     }

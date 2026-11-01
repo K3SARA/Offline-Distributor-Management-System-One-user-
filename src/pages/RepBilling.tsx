@@ -17,7 +17,8 @@ import {
   LogOut,
   ChevronRight,
   Check,
-  RotateCcw
+  RotateCcw,
+  Target
 } from 'lucide-react';
 import { Customer, Product, Lorry, Order, User } from '../types';
 import { CustomerService, LorryService, ProductService, OrderService } from '../services/api';
@@ -427,6 +428,29 @@ export const RepBilling: React.FC<RepBillingProps> = ({
         {/* ======================================================== */}
         {currentStep === 1 && (
           <div className="space-y-3">
+            {/* Rep Sales Target Goal Widget */}
+            {user?.monthlyTarget && user.monthlyTarget > 0 ? (
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-2.5 flex items-center justify-between text-xs shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
+                    <Target className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-900 block text-[11px]">Monthly Goal</span>
+                    <span className="text-[10px] text-slate-500 font-medium">Daily: {formatMoney(user.dailyTarget || 0)}</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="font-mono font-bold text-blue-700 bg-white px-2 py-0.5 rounded-lg shadow-2xs border border-blue-100 text-xs inline-block">
+                    {formatMoney(user.monthlyTarget)}
+                  </span>
+                  {user.targetNewClients ? (
+                    <span className="block text-[9px] text-slate-400 font-medium mt-0.5">Target: {user.targetNewClients} new shops</span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
             {/* Search Input */}
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />

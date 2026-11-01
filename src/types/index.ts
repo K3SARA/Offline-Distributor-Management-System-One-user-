@@ -521,8 +521,14 @@ export interface User {
     vehicleNumber: string;
     driverName: string;
     routeId?: string | null;
+    route?: Route | null;
     routeName?: string | null;
     routeCode?: string | null;
   } | null;
   status: 'ACTIVE' | 'INACTIVE';
+  monthlyTarget?: number;
+  dailyTarget?: number;
+  targetNewClients?: number;
+  actualSalesThisMonth?: number;
+  achievementPercentage?: number;
 }

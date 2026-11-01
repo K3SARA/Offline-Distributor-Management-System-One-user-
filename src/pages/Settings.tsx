@@ -19,10 +19,15 @@ import {
   Download,
   Upload,
   Cloud,
-  Trash2
+  Trash2,
+  Users,
+  Target,
+  UserPlus,
+  KeyRound,
+  TrendingUp
 } from 'lucide-react';
-import { LorryService, RouteService, SettingsService, BackupService } from '../services/api';
-import { Lorry, Route, SystemSettings } from '../types';
+import { LorryService, RouteService, SettingsService, BackupService, AuthService } from '../services/api';
+import { Lorry, Route, SystemSettings, User } from '../types';
 import { useCurrency, CURRENCIES, CurrencyCode } from '../context/CurrencyContext';
 
 export const Settings: React.FC = () => {
@@ -75,6 +80,131 @@ export const Settings: React.FC = () => {
   });
   const [savingRoute, setSavingRoute] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
+
+  // Sales Rep Management State
+  const [users, setUsers] = useState<User[]>([]);
+  const [editingRep, setEditingRep] = useState<User | null>(null);
+  const [isNewRep, setIsNewRep] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [repForm, setRepForm] = useState({
+    fullName: '',
+    username: '',
+    password: '',
+    phone: '',
+    lorryId: '',
+    status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
+    monthlyTarget: 500000,
+    dailyTarget: 20000,
+    targetNewClients: 5
+  });
+  const [savingRep, setSavingRep] = useState(false);
+  const [repError, setRepError] = useState<string | null>(null);
+
+  const handleOpenAddRep = () => {
+    setIsNewRep(true);
+    setEditingRep({ id: '', username: '', fullName: '', role: 'REP', status: 'ACTIVE' });
+    setRepForm({
+      fullName: '',
+      username: '',
+      password: '',
+      phone: '',
+      lorryId: lorries[0]?.id || '',
+      status: 'ACTIVE',
+      monthlyTarget: 500000,
+      dailyTarget: 20000,
+      targetNewClients: 5
+    });
+    setShowPassword(false);
+    setRepError(null);
+  };
+
+  const handleOpenEditRep = (rep: User) => {
+    setIsNewRep(false);
+    setEditingRep(rep);
+    setRepForm({
+      fullName: rep.fullName,
+      username: rep.username,
+      password: '',
+      phone: rep.phone || '',
+      lorryId: rep.lorryId || '',
+      status: rep.status,
+      monthlyTarget: rep.monthlyTarget || 0,
+      dailyTarget: rep.dailyTarget || 0,
+      targetNewClients: rep.targetNewClients || 0
+    });
+    setShowPassword(false);
+    setRepError(null);
+  };
+
+  const handleSaveRep = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!repForm.fullName.trim() || !repForm.username.trim()) {
+      setRepError('Full name and username are required.');
+      return;
+    }
+    if (isNewRep && !repForm.password.trim()) {
+      setRepError('Password is required for a new sales rep.');
+      return;
+    }
+
+    try {
+      setSavingRep(true);
+      setRepError(null);
+
+      if (isNewRep) {
+        await AuthService.createUser({
+          fullName: repForm.fullName.trim(),
+          username: repForm.username.trim().toLowerCase(),
+          password: repForm.password.trim(),
+          phone: repForm.phone.trim() || undefined,
+          lorryId: repForm.lorryId || undefined,
+          role: 'REP',
+          monthlyTarget: Number(repForm.monthlyTarget) || 0,
+          dailyTarget: Number(repForm.dailyTarget) || 0,
+          targetNewClients: Number(repForm.targetNewClients) || 0
+        });
+        setSaveSuccess(`Sales Rep "${repForm.fullName}" registered successfully!`);
+      } else if (editingRep) {
+        await AuthService.updateUser(editingRep.id, {
+          fullName: repForm.fullName.trim(),
+          phone: repForm.phone.trim() || undefined,
+          lorryId: repForm.lorryId || undefined,
+          status: repForm.status,
+          monthlyTarget: Number(repForm.monthlyTarget) || 0,
+          dailyTarget: Number(repForm.dailyTarget) || 0,
+          targetNewClients: Number(repForm.targetNewClients) || 0,
+          ...(repForm.password.trim() ? { password: repForm.password.trim() } : {})
+        });
+        setSaveSuccess(`Sales Rep "${repForm.fullName}" updated successfully!`);
+      }
+
+      setTimeout(() => setSaveSuccess(null), 4000);
+      setEditingRep(null);
+      await loadData();
+    } catch (err: any) {
+      setRepError(err.response?.data?.error || err.message || 'Failed to save sales rep');
+    } finally {
+      setSavingRep(false);
+    }
+  };
+
+  const handleDeleteRep = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete or deactivate sales rep "${name}"?`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await AuthService.deleteUser(id);
+      setSaveSuccess(`Sales rep "${name}" deleted/deactivated.`);
+      setTimeout(() => setSaveSuccess(null), 4000);
+      await loadData();
+    } catch (err: any) {
+      setSaveError(err.response?.data?.error || err.message || 'Failed to delete sales rep');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleOpenAddRoute = () => {
     const nextNum = routes.length + 1;
@@ -184,14 +314,16 @@ export const Settings: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [lorryData, routeData, settingsData] = await Promise.all([
+      const [lorryData, routeData, settingsData, userData] = await Promise.all([
         LorryService.getAll(),
         RouteService.getAll(),
-        SettingsService.get().catch(() => null)
+        SettingsService.get().catch(() => null),
+        AuthService.getUsers().catch(() => [])
       ]);
 
       setLorries(lorryData);
       setRoutes(routeData);
+      setUsers(userData);
       if (settingsData) {
         setSettings(settingsData);
         if (settingsData.defaultCurrency && CURRENCIES[settingsData.defaultCurrency as CurrencyCode]) {
@@ -447,7 +579,184 @@ export const Settings: React.FC = () => {
         </div>
       </div>
 
-      {/* SECTION 2: COMPANY & BUSINESS PROFILE */}
+      {/* SECTION 2: ROUTE SALES REPS & TARGET MANAGEMENT */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <Users className="w-5 h-5 text-indigo-600" />
+              Route Sales Representatives & Monthly Targets
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Create and manage mobile route rep logins, assigned distribution lorries, and sales revenue targets.
+            </p>
+          </div>
+
+          <button
+            onClick={handleOpenAddRep}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold rounded-2xl shadow-sm transition self-start sm:self-auto cursor-pointer"
+          >
+            <UserPlus className="w-4 h-4" /> Add Sales Rep
+          </button>
+        </div>
+
+        {/* Rep Cards Grid */}
+        {users.filter(u => u.role === 'REP').length === 0 ? (
+          <div className="bg-white border border-dashed border-slate-200 rounded-3xl p-8 text-center space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto">
+              <Users className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-800 text-sm">No Sales Reps Registered Yet</h3>
+              <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                Add your field sales representatives to generate their mobile billing credentials and assign sales targets.
+              </p>
+            </div>
+            <button
+              onClick={handleOpenAddRep}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4" /> Add First Sales Rep
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {users
+              .filter(u => u.role === 'REP')
+              .map(rep => {
+                const monthlyTarget = rep.monthlyTarget || 0;
+                const actualSales = rep.actualSalesThisMonth || 0;
+                const progressPct = monthlyTarget > 0 ? Math.min(100, Math.round((actualSales / monthlyTarget) * 100)) : 0;
+
+                return (
+                  <div
+                    key={rep.id}
+                    className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-2xs hover:shadow-md transition space-y-4 flex flex-col justify-between"
+                  >
+                    <div className="space-y-3">
+                      {/* Rep Header */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-bold text-sm shadow-2xs shrink-0">
+                            {rep.fullName.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <span className="font-bold text-sm text-slate-900 block leading-tight">
+                              {rep.fullName}
+                            </span>
+                            <span className="text-[11px] font-mono text-slate-400">
+                              @{rep.username}
+                            </span>
+                          </div>
+                        </div>
+
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            rep.status === 'ACTIVE'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                          }`}
+                        >
+                          {rep.status}
+                        </span>
+                      </div>
+
+                      {/* Fleet & Phone Info */}
+                      <div className="p-3 bg-slate-50/80 rounded-2xl space-y-1.5 border border-slate-100 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                            Assigned Lorry
+                          </span>
+                          <span className="font-mono font-bold text-slate-800">
+                            {rep.lorry?.vehicleNumber || 'Unassigned'}
+                          </span>
+                        </div>
+
+                        {rep.lorry?.route && (
+                          <div className="flex items-center justify-between text-slate-600 text-[11px]">
+                            <span className="text-slate-400">Route:</span>
+                            <span className="font-semibold text-blue-700 truncate max-w-[150px]">
+                              {rep.lorry.route.name}
+                            </span>
+                          </div>
+                        )}
+
+                        {rep.phone && (
+                          <div className="flex items-center justify-between text-slate-500 text-[11px] pt-1 border-t border-slate-200/60">
+                            <span className="text-slate-400">Phone:</span>
+                            <span className="font-mono">{rep.phone}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Target & Achievement Box */}
+                      <div className="p-3.5 bg-indigo-50/50 border border-indigo-100/80 rounded-2xl space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                            <Target className="w-3.5 h-3.5 text-indigo-600" />
+                            Monthly Target
+                          </span>
+                          <span className="text-xs font-mono font-bold text-indigo-900">
+                            {currency} {monthlyTarget.toLocaleString()}
+                          </span>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="space-y-1">
+                          <div className="w-full bg-slate-200/80 rounded-full h-2 overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                progressPct >= 100
+                                  ? 'bg-emerald-500'
+                                  : progressPct >= 50
+                                  ? 'bg-indigo-600'
+                                  : 'bg-amber-500'
+                              }`}
+                              style={{ width: `${progressPct}%` }}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500">
+                            <span>
+                              Billed: <strong className="text-slate-800">{currency} {actualSales.toLocaleString()}</strong>
+                            </span>
+                            <span className={progressPct >= 100 ? 'text-emerald-700 font-bold' : 'text-indigo-700 font-bold'}>
+                              {progressPct}% reached
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Additional Target Metrics */}
+                        <div className="pt-2 border-t border-indigo-100/60 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+                          <span>Daily: <strong>{currency} {(rep.dailyTarget || 0).toLocaleString()}</strong></span>
+                          <span>New Shops: <strong>{rep.targetNewClients || 0}/mo</strong></span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Card Actions */}
+                    <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                      <button
+                        onClick={() => handleOpenEditRep(rep)}
+                        className="flex-1 py-2 px-3 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" /> Edit & Targets
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRep(rep.id, rep.fullName)}
+                        title="Delete or deactivate rep"
+                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 3: COMPANY & BUSINESS PROFILE */}
       <form onSubmit={handleSaveSettings} className="space-y-6">
         <div className="bg-white border border-slate-200/80 rounded-3xl p-5 sm:p-7 shadow-2xs space-y-5">
           <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
@@ -985,6 +1294,209 @@ export const Settings: React.FC = () => {
                 >
                   <Plus className="w-4 h-4" />
                   {savingRoute ? 'Saving...' : 'Save & Assign Route'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* EDIT / CREATE SALES REP & TARGETS MODAL */}
+      {editingRep && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-5 my-8">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">
+                    {isNewRep ? 'Register New Sales Rep' : 'Edit Sales Rep & Targets'}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Configure mobile login credentials, route lorry assignment, and sales targets.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setEditingRep(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {repError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{repError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveRep} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Sunil Perera"
+                    value={repForm.fullName}
+                    onChange={(e) => setRepForm({ ...repForm, fullName: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Phone Number
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. +94 77 123 4501"
+                    value={repForm.phone}
+                    onChange={(e) => setRepForm({ ...repForm, phone: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Login Username *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    disabled={!isNewRep}
+                    placeholder="e.g. rep1"
+                    value={repForm.username}
+                    onChange={(e) => setRepForm({ ...repForm, username: e.target.value.toLowerCase().trim() })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-mono font-bold text-slate-900 disabled:bg-slate-100 disabled:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    {isNewRep ? 'Login Password *' : 'Reset Password'}
+                  </label>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder={isNewRep ? 'Enter password' : 'Leave blank to keep current'}
+                    value={repForm.password}
+                    onChange={(e) => setRepForm({ ...repForm, password: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Assigned Delivery Lorry
+                  </label>
+                  <select
+                    value={repForm.lorryId}
+                    onChange={(e) => setRepForm({ ...repForm, lorryId: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">-- No Lorry Assigned --</option>
+                    {lorries.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.vehicleNumber} ({l.driverName}) {l.route ? `— ${l.route.name}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Account Status
+                  </label>
+                  <select
+                    value={repForm.status}
+                    onChange={(e) => setRepForm({ ...repForm, status: e.target.value as any })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="ACTIVE">ACTIVE (Authorized to Bill)</option>
+                    <option value="INACTIVE">INACTIVE (Login Blocked)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Targets Subsection */}
+              <div className="pt-3 border-t border-slate-100 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Target className="w-4 h-4 text-indigo-600" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    Performance Sales Targets (Admin Set)
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 block mb-1">
+                      Monthly Target ({currency})
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="5000"
+                      value={repForm.monthlyTarget}
+                      onChange={(e) => setRepForm({ ...repForm, monthlyTarget: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 block mb-1">
+                      Daily Target ({currency})
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1000"
+                      value={repForm.dailyTarget}
+                      onChange={(e) => setRepForm({ ...repForm, dailyTarget: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 block mb-1">
+                      New Shops / Mo
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={repForm.targetNewClients}
+                      onChange={(e) => setRepForm({ ...repForm, targetNewClients: parseInt(e.target.value, 10) || 0 })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setEditingRep(null)}
+                  className="px-4 py-2.5 text-slate-600 hover:text-slate-800 font-semibold text-xs rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingRep}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-sm transition disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                  <Save className="w-4 h-4" />
+                  {savingRep ? 'Saving Rep...' : isNewRep ? 'Register Rep' : 'Update Rep & Targets'}
                 </button>
               </div>
             </form>
