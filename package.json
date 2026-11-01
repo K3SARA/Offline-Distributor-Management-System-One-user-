@@ -17,6 +17,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev --name init",
     "prisma:seed": "tsx prisma/seed.ts",
+    "db:wipe": "node scripts/wipe-data.js",
     "use:postgres": "node -e \"require('fs').copyFileSync('prisma/schema.postgresql.prisma', 'prisma/schema.prisma')\" && prisma generate",
     "use:sqlite": "node -e \"require('fs').writeFileSync('prisma/schema.prisma', require('fs').readFileSync('prisma/schema.prisma', 'utf8').replace(/provider = \\\"postgresql\\\"/, 'provider = \\\"sqlite\\\"'))\" && prisma generate"
   },

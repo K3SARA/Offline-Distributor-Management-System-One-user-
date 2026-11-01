@@ -837,6 +837,50 @@ app.post('/api/backup/import', async (req: Request, res: Response) => {
   }
 });
 
+// Purge all demo/transactional data and retain only default admin account
+app.post('/api/database/wipe-all', async (req: Request, res: Response) => {
+  try {
+    await prisma.billPaymentAllocation.deleteMany();
+    await prisma.customerPayment.deleteMany();
+    await prisma.orderItem.deleteMany();
+    await prisma.order.deleteMany();
+    await prisma.lorryLoadingItem.deleteMany();
+    await prisma.lorryLoading.deleteMany();
+    await prisma.purchaseOrderItem.deleteMany();
+    await prisma.purchaseOrder.deleteMany();
+    await prisma.expense.deleteMany();
+    await prisma.lorryStock.deleteMany();
+    await prisma.stockMovement.deleteMany();
+    await prisma.productionRunItem.deleteMany();
+    await prisma.productionRun.deleteMany();
+    await prisma.recipeItem.deleteMany();
+    await prisma.recipe.deleteMany();
+    await prisma.customer.deleteMany();
+    await prisma.product.deleteMany();
+    await prisma.supplier.deleteMany();
+    await prisma.user.deleteMany();
+    await prisma.lorry.deleteMany();
+    await prisma.route.deleteMany();
+
+    await prisma.user.create({
+      data: {
+        username: 'admin',
+        password: 'admin123',
+        fullName: 'Administrator',
+        role: 'ADMIN'
+      }
+    });
+
+    return res.json({
+      success: true,
+      message: 'All demo and test data purged successfully. Database is now completely clean.'
+    });
+  } catch (err: any) {
+    console.error('[Database Wipe Error]', err);
+    return res.status(500).json({ error: 'Failed to wipe database: ' + err.message });
+  }
+});
+
 // ========================================================
 // 1. INVENTORY & WAREHOUSE MANAGEMENT
 // ========================================================

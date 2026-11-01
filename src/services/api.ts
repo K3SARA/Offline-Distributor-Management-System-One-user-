@@ -299,6 +299,8 @@ export const BackupService = {
       return response.data;
     }),
   importData: (payload: any) =>
-    api.post<{ success: boolean; message: string; importedCounts: Record<string, number> }>('/backup/import', payload).then(r => r.data)
+    api.post<{ success: boolean; message: string; importedCounts: Record<string, number> }>('/backup/import', payload).then(r => r.data),
+  wipeDatabase: () =>
+    api.post<{ success: boolean; message: string }>('/database/wipe-all').then(r => r.data)
 };
 
