@@ -283,3 +283,22 @@ export const AuthService = {
     api.delete<{ success: boolean }>(`/users/${id}`).then(r => r.data)
 };
 
+export const BackupService = {
+  exportData: () =>
+    api.get('/backup/export').then(response => {
+      const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const dateStr = new Date().toISOString().slice(0, 10);
+      a.download = `distributor_pro_backup_${dateStr}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      return response.data;
+    }),
+  importData: (payload: any) =>
+    api.post<{ success: boolean; message: string; importedCounts: Record<string, number> }>('/backup/import', payload).then(r => r.data)
+};
+

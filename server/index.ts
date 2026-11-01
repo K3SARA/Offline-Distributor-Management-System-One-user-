@@ -10,7 +10,8 @@ const PORT = process.env.PORT || 4812;
 const HOST = process.env.HOST || '0.0.0.0';
 
 app.use(cors({ origin: '*' }));
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Request logging in dev
 app.use((req, res, next) => {
@@ -182,6 +183,657 @@ app.delete('/api/users/:id', async (req: Request, res: Response) => {
     return res.json({ success: true });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// ========================================================
+// 0.2 BACKUP & DATA MIGRATION ENGINE (CLOUD -> OFFLINE DESKTOP)
+// ========================================================
+
+// 1. Export complete system snapshot as JSON
+app.get('/api/backup/export', async (req: Request, res: Response) => {
+  try {
+    const settings = getSettings();
+    const [
+      users,
+      suppliers,
+      products,
+      routes,
+      lorries,
+      lorryStocks,
+      customers,
+      loadings,
+      orders,
+      customerPayments,
+      billPaymentAllocations,
+      expenses,
+      recipes,
+      productionRuns
+    ] = await Promise.all([
+      prisma.user.findMany(),
+      prisma.supplier.findMany(),
+      prisma.product.findMany(),
+      prisma.route.findMany(),
+      prisma.lorry.findMany(),
+      prisma.lorryStock.findMany(),
+      prisma.customer.findMany(),
+      prisma.lorryLoading.findMany({ include: { items: true } }),
+      prisma.order.findMany({ include: { items: true } }),
+      prisma.customerPayment.findMany(),
+      prisma.billPaymentAllocation.findMany(),
+      prisma.expense.findMany(),
+      prisma.recipe.findMany({ include: { items: true } }),
+      prisma.productionRun.findMany({ include: { items: true } })
+    ]);
+
+    const backupPayload = {
+      version: '1.0.0',
+      system: 'Distributor Pro Enterprise',
+      exportedAt: new Date().toISOString(),
+      counts: {
+        users: users.length,
+        suppliers: suppliers.length,
+        products: products.length,
+        routes: routes.length,
+        lorries: lorries.length,
+        customers: customers.length,
+        loadings: loadings.length,
+        orders: orders.length,
+        payments: customerPayments.length,
+        allocations: billPaymentAllocations.length,
+        expenses: expenses.length,
+        recipes: recipes.length,
+        productionRuns: productionRuns.length
+      },
+      data: {
+        settings,
+        users,
+        suppliers,
+        products,
+        routes,
+        lorries,
+        lorryStocks,
+        customers,
+        loadings,
+        orders,
+        customerPayments,
+        billPaymentAllocations,
+        expenses,
+        recipes,
+        productionRuns
+      }
+    };
+
+    const filename = `distributor_backup_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.json`;
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'application/json');
+    return res.json(backupPayload);
+  } catch (err: any) {
+    console.error('[Backup Export Error]', err);
+    return res.status(500).json({ error: 'Failed to generate backup: ' + err.message });
+  }
+});
+
+// 2. Ingest and restore JSON snapshot into local database
+app.post('/api/backup/import', async (req: Request, res: Response) => {
+  try {
+    const backup = req.body;
+    const data = backup.data || backup;
+    if (!data) {
+      return res.status(400).json({ error: 'Invalid backup format: missing "data" node.' });
+    }
+
+    const {
+      settings,
+      users = [],
+      suppliers = [],
+      products = [],
+      routes = [],
+      lorries = [],
+      lorryStocks = [],
+      customers = [],
+      loadings = [],
+      orders = [],
+      customerPayments = [],
+      billPaymentAllocations = [],
+      expenses = [],
+      recipes = [],
+      productionRuns = []
+    } = data;
+
+    // 1. Settings
+    if (settings) {
+      saveSettings(settings);
+    }
+
+    // 2. Routes (first, before lorries & customers)
+    for (const r of routes) {
+      await prisma.route.upsert({
+        where: { id: r.id },
+        update: { code: r.code, name: r.name, description: r.description },
+        create: { id: r.id, code: r.code, name: r.name, description: r.description }
+      });
+    }
+
+    // 3. Lorries
+    for (const l of lorries) {
+      await prisma.lorry.upsert({
+        where: { id: l.id },
+        update: {
+          vehicleNumber: l.vehicleNumber,
+          driverName: l.driverName,
+          driverPhone: l.driverPhone,
+          routeId: l.routeId || null,
+          status: l.status || 'ACTIVE'
+        },
+        create: {
+          id: l.id,
+          vehicleNumber: l.vehicleNumber,
+          driverName: l.driverName,
+          driverPhone: l.driverPhone,
+          routeId: l.routeId || null,
+          status: l.status || 'ACTIVE'
+        }
+      });
+    }
+
+    // 4. Users
+    for (const u of users) {
+      await prisma.user.upsert({
+        where: { username: u.username },
+        update: {
+          password: u.password,
+          fullName: u.fullName,
+          role: u.role || 'REP',
+          phone: u.phone || null,
+          lorryId: u.lorryId || null,
+          status: u.status || 'ACTIVE'
+        },
+        create: {
+          id: u.id,
+          username: u.username,
+          password: u.password,
+          fullName: u.fullName,
+          role: u.role || 'REP',
+          phone: u.phone || null,
+          lorryId: u.lorryId || null,
+          status: u.status || 'ACTIVE'
+        }
+      });
+    }
+
+    // 5. Suppliers
+    for (const s of suppliers) {
+      await prisma.supplier.upsert({
+        where: { id: s.id },
+        update: {
+          code: s.code,
+          name: s.name,
+          contactPerson: s.contactPerson || null,
+          phone: s.phone,
+          email: s.email || null,
+          address: s.address || null,
+          city: s.city || 'Colombo',
+          paymentTerms: s.paymentTerms || 'NET 30',
+          outstandingBalance: s.outstandingBalance || 0
+        },
+        create: {
+          id: s.id,
+          code: s.code,
+          name: s.name,
+          contactPerson: s.contactPerson || null,
+          phone: s.phone,
+          email: s.email || null,
+          address: s.address || null,
+          city: s.city || 'Colombo',
+          paymentTerms: s.paymentTerms || 'NET 30',
+          outstandingBalance: s.outstandingBalance || 0
+        }
+      });
+    }
+
+    // 6. Products
+    for (const p of products) {
+      await prisma.product.upsert({
+        where: { id: p.id },
+        update: {
+          sku: p.sku,
+          name: p.name,
+          category: p.category,
+          unit: p.unit,
+          unitPrice: p.unitPrice,
+          costPrice: p.costPrice,
+          currentStock: p.currentStock,
+          minStockAlert: p.minStockAlert,
+          freeRatioBuy: p.freeRatioBuy || 0,
+          freeRatioGet: p.freeRatioGet || 0,
+          isRawMaterial: p.isRawMaterial || false,
+          supplierId: p.supplierId || null
+        },
+        create: {
+          id: p.id,
+          sku: p.sku,
+          name: p.name,
+          category: p.category,
+          unit: p.unit,
+          unitPrice: p.unitPrice,
+          costPrice: p.costPrice,
+          currentStock: p.currentStock,
+          minStockAlert: p.minStockAlert,
+          freeRatioBuy: p.freeRatioBuy || 0,
+          freeRatioGet: p.freeRatioGet || 0,
+          isRawMaterial: p.isRawMaterial || false,
+          supplierId: p.supplierId || null
+        }
+      });
+    }
+
+    // 7. Lorry Stocks
+    for (const ls of lorryStocks) {
+      await prisma.lorryStock.upsert({
+        where: {
+          lorryId_productId: {
+            lorryId: ls.lorryId,
+            productId: ls.productId
+          }
+        },
+        update: { quantity: ls.quantity },
+        create: {
+          id: ls.id,
+          lorryId: ls.lorryId,
+          productId: ls.productId,
+          quantity: ls.quantity
+        }
+      });
+    }
+
+    // 8. Customers
+    for (const c of customers) {
+      await prisma.customer.upsert({
+        where: { id: c.id },
+        update: {
+          code: c.code,
+          name: c.name,
+          companyName: c.companyName || null,
+          phone: c.phone,
+          deliveryAddress: c.deliveryAddress,
+          city: c.city || 'Local',
+          routeId: c.routeId || null,
+          pricingTier: c.pricingTier || 'STANDARD',
+          creditLimit: c.creditLimit || 50000,
+          discountPercentage: c.discountPercentage || 0,
+          outstandingBalance: c.outstandingBalance || 0,
+          maxCreditInvoices: c.maxCreditInvoices || 1
+        },
+        create: {
+          id: c.id,
+          code: c.code,
+          name: c.name,
+          companyName: c.companyName || null,
+          phone: c.phone,
+          deliveryAddress: c.deliveryAddress,
+          city: c.city || 'Local',
+          routeId: c.routeId || null,
+          pricingTier: c.pricingTier || 'STANDARD',
+          creditLimit: c.creditLimit || 50000,
+          discountPercentage: c.discountPercentage || 0,
+          outstandingBalance: c.outstandingBalance || 0,
+          maxCreditInvoices: c.maxCreditInvoices || 1
+        }
+      });
+    }
+
+    // 9. Loadings and Loading Items
+    for (const ld of loadings) {
+      await prisma.lorryLoading.upsert({
+        where: { id: ld.id },
+        update: {
+          loadingNumber: ld.loadingNumber,
+          lorryId: ld.lorryId,
+          routeId: ld.routeId || null,
+          date: new Date(ld.date),
+          status: ld.status || 'LOADED',
+          notes: ld.notes || null,
+          totalLoadedItems: ld.totalLoadedItems || 0,
+          totalSoldItems: ld.totalSoldItems || 0,
+          totalFreeItems: ld.totalFreeItems || 0,
+          totalReturnedItems: ld.totalReturnedItems || 0,
+          totalSalesAmount: ld.totalSalesAmount || 0,
+          cashCollected: ld.cashCollected || 0
+        },
+        create: {
+          id: ld.id,
+          loadingNumber: ld.loadingNumber,
+          lorryId: ld.lorryId,
+          routeId: ld.routeId || null,
+          date: new Date(ld.date),
+          status: ld.status || 'LOADED',
+          notes: ld.notes || null,
+          totalLoadedItems: ld.totalLoadedItems || 0,
+          totalSoldItems: ld.totalSoldItems || 0,
+          totalFreeItems: ld.totalFreeItems || 0,
+          totalReturnedItems: ld.totalReturnedItems || 0,
+          totalSalesAmount: ld.totalSalesAmount || 0,
+          cashCollected: ld.cashCollected || 0
+        }
+      });
+
+      if (Array.isArray(ld.items)) {
+        for (const item of ld.items) {
+          await prisma.lorryLoadingItem.upsert({
+            where: { id: item.id },
+            update: {
+              loadingId: ld.id,
+              productId: item.productId,
+              loadedQty: item.loadedQty || 0,
+              soldQty: item.soldQty || 0,
+              freeQty: item.freeQty || 0,
+              returnedQty: item.returnedQty || 0,
+              discrepancyQty: item.discrepancyQty || 0
+            },
+            create: {
+              id: item.id,
+              loadingId: ld.id,
+              productId: item.productId,
+              loadedQty: item.loadedQty || 0,
+              soldQty: item.soldQty || 0,
+              freeQty: item.freeQty || 0,
+              returnedQty: item.returnedQty || 0,
+              discrepancyQty: item.discrepancyQty || 0
+            }
+          });
+        }
+      }
+    }
+
+    // 10. Orders & Order Items
+    for (const ord of orders) {
+      await prisma.order.upsert({
+        where: { id: ord.id },
+        update: {
+          orderNumber: ord.orderNumber,
+          paperBillNumber: ord.paperBillNumber || null,
+          customerId: ord.customerId,
+          lorryId: ord.lorryId || null,
+          routeId: ord.routeId || null,
+          subtotal: ord.subtotal || 0,
+          discountAmount: ord.discountAmount || 0,
+          taxAmount: ord.taxAmount || 0,
+          netTotal: ord.netTotal || 0,
+          cashReceived: ord.cashReceived || 0,
+          paidAmount: ord.paidAmount || 0,
+          balanceAmount: ord.balanceAmount || 0,
+          paymentMethod: ord.paymentMethod || 'CASH',
+          paymentStatus: ord.paymentStatus || 'PAID',
+          status: ord.status || 'COMPLETED',
+          notes: ord.notes || null,
+          createdAt: new Date(ord.createdAt)
+        },
+        create: {
+          id: ord.id,
+          orderNumber: ord.orderNumber,
+          paperBillNumber: ord.paperBillNumber || null,
+          customerId: ord.customerId,
+          lorryId: ord.lorryId || null,
+          routeId: ord.routeId || null,
+          subtotal: ord.subtotal || 0,
+          discountAmount: ord.discountAmount || 0,
+          taxAmount: ord.taxAmount || 0,
+          netTotal: ord.netTotal || 0,
+          cashReceived: ord.cashReceived || 0,
+          paidAmount: ord.paidAmount || 0,
+          balanceAmount: ord.balanceAmount || 0,
+          paymentMethod: ord.paymentMethod || 'CASH',
+          paymentStatus: ord.paymentStatus || 'PAID',
+          status: ord.status || 'COMPLETED',
+          notes: ord.notes || null,
+          createdAt: new Date(ord.createdAt)
+        }
+      });
+
+      if (Array.isArray(ord.items)) {
+        for (const it of ord.items) {
+          await prisma.orderItem.upsert({
+            where: { id: it.id },
+            update: {
+              orderId: ord.id,
+              productId: it.productId,
+              unitPrice: it.unitPrice || 0,
+              quantity: it.quantity || 1,
+              freeQuantity: it.freeQuantity || 0,
+              lineTotal: it.lineTotal || 0
+            },
+            create: {
+              id: it.id,
+              orderId: ord.id,
+              productId: it.productId,
+              unitPrice: it.unitPrice || 0,
+              quantity: it.quantity || 1,
+              freeQuantity: it.freeQuantity || 0,
+              lineTotal: it.lineTotal || 0
+            }
+          });
+        }
+      }
+    }
+
+    // 11. Customer Payments
+    for (const cp of customerPayments) {
+      await prisma.customerPayment.upsert({
+        where: { id: cp.id },
+        update: {
+          receiptNumber: cp.receiptNumber,
+          customerId: cp.customerId,
+          lorryId: cp.lorryId || null,
+          amount: cp.amount,
+          paymentMethod: cp.paymentMethod || 'CASH',
+          chequeNumber: cp.chequeNumber || null,
+          bankName: cp.bankName || null,
+          reference: cp.reference || null,
+          notes: cp.notes || null,
+          collectedBy: cp.collectedBy || null,
+          createdAt: new Date(cp.createdAt)
+        },
+        create: {
+          id: cp.id,
+          receiptNumber: cp.receiptNumber,
+          customerId: cp.customerId,
+          lorryId: cp.lorryId || null,
+          amount: cp.amount,
+          paymentMethod: cp.paymentMethod || 'CASH',
+          chequeNumber: cp.chequeNumber || null,
+          bankName: cp.bankName || null,
+          reference: cp.reference || null,
+          notes: cp.notes || null,
+          collectedBy: cp.collectedBy || null,
+          createdAt: new Date(cp.createdAt)
+        }
+      });
+    }
+
+    // 11.1 Bill Payment Allocations
+    for (const bpa of billPaymentAllocations) {
+      await prisma.billPaymentAllocation.upsert({
+        where: { id: bpa.id },
+        update: {
+          paymentId: bpa.paymentId,
+          orderId: bpa.orderId,
+          amount: bpa.amount
+        },
+        create: {
+          id: bpa.id,
+          paymentId: bpa.paymentId,
+          orderId: bpa.orderId,
+          amount: bpa.amount
+        }
+      });
+    }
+
+    // 12. Expenses
+    for (const exp of expenses) {
+      await prisma.expense.upsert({
+        where: { id: exp.id },
+        update: {
+          expenseNumber: exp.expenseNumber,
+          category: exp.category,
+          title: exp.title,
+          amount: exp.amount,
+          paymentMethod: exp.paymentMethod || 'CASH',
+          referenceNumber: exp.referenceNumber || null,
+          paidTo: exp.paidTo || null,
+          notes: exp.notes || null,
+          lorryId: exp.lorryId || null,
+          date: new Date(exp.date),
+          createdAt: new Date(exp.createdAt)
+        },
+        create: {
+          id: exp.id,
+          expenseNumber: exp.expenseNumber,
+          category: exp.category,
+          title: exp.title,
+          amount: exp.amount,
+          paymentMethod: exp.paymentMethod || 'CASH',
+          referenceNumber: exp.referenceNumber || null,
+          paidTo: exp.paidTo || null,
+          notes: exp.notes || null,
+          lorryId: exp.lorryId || null,
+          date: new Date(exp.date),
+          createdAt: new Date(exp.createdAt)
+        }
+      });
+    }
+
+
+
+    // 13. Recipes & Recipe Items
+    for (const r of recipes) {
+      await prisma.recipe.upsert({
+        where: { id: r.id },
+        update: {
+          code: r.code,
+          name: r.name,
+          productId: r.productId,
+          outputYield: r.outputYield || 1,
+          estimatedOverheadCost: r.estimatedOverheadCost || 0,
+          notes: r.notes || null
+        },
+        create: {
+          id: r.id,
+          code: r.code,
+          name: r.name,
+          productId: r.productId,
+          outputYield: r.outputYield || 1,
+          estimatedOverheadCost: r.estimatedOverheadCost || 0,
+          notes: r.notes || null
+        }
+      });
+
+      if (Array.isArray(r.items)) {
+        for (const item of r.items) {
+          await prisma.recipeItem.upsert({
+            where: { id: item.id },
+            update: {
+              recipeId: r.id,
+              componentProductId: item.componentProductId,
+              quantity: item.quantity,
+              notes: item.notes || null
+            },
+            create: {
+              id: item.id,
+              recipeId: r.id,
+              componentProductId: item.componentProductId,
+              quantity: item.quantity,
+              notes: item.notes || null
+            }
+          });
+        }
+      }
+    }
+
+    // 14. Production Runs & Items
+    for (const pr of productionRuns) {
+      await prisma.productionRun.upsert({
+        where: { id: pr.id },
+        update: {
+          batchNumber: pr.batchNumber,
+          recipeId: pr.recipeId,
+          targetQuantity: pr.targetQuantity,
+          actualQuantity: pr.actualQuantity || 0,
+          status: pr.status || 'COMPLETED',
+          totalRawMaterialCost: pr.totalRawMaterialCost || 0,
+          overheadCost: pr.overheadCost || 0,
+          totalProductionCost: pr.totalProductionCost || 0,
+          unitCost: pr.unitCost || 0,
+          producedBy: pr.producedBy || null,
+          notes: pr.notes || null,
+          startDate: new Date(pr.startDate),
+          completedAt: pr.completedAt ? new Date(pr.completedAt) : null
+        },
+        create: {
+          id: pr.id,
+          batchNumber: pr.batchNumber,
+          recipeId: pr.recipeId,
+          targetQuantity: pr.targetQuantity,
+          actualQuantity: pr.actualQuantity || 0,
+          status: pr.status || 'COMPLETED',
+          totalRawMaterialCost: pr.totalRawMaterialCost || 0,
+          overheadCost: pr.overheadCost || 0,
+          totalProductionCost: pr.totalProductionCost || 0,
+          unitCost: pr.unitCost || 0,
+          producedBy: pr.producedBy || null,
+          notes: pr.notes || null,
+          startDate: new Date(pr.startDate),
+          completedAt: pr.completedAt ? new Date(pr.completedAt) : null
+        }
+      });
+
+      if (Array.isArray(pr.items)) {
+        for (const it of pr.items) {
+          await prisma.productionRunItem.upsert({
+            where: { id: it.id },
+            update: {
+              productionRunId: pr.id,
+              productId: it.productId,
+              plannedQuantity: it.plannedQuantity,
+              actualQuantity: it.actualQuantity,
+              unitCost: it.unitCost,
+              lineCost: it.lineCost
+            },
+            create: {
+              id: it.id,
+              productionRunId: pr.id,
+              productId: it.productId,
+              plannedQuantity: it.plannedQuantity,
+              actualQuantity: it.actualQuantity,
+              unitCost: it.unitCost,
+              lineCost: it.lineCost
+            }
+          });
+        }
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: 'Cloud backup successfully restored into database!',
+      importedCounts: {
+        users: users.length,
+        suppliers: suppliers.length,
+        products: products.length,
+        routes: routes.length,
+        lorries: lorries.length,
+        customers: customers.length,
+        loadings: loadings.length,
+        orders: orders.length,
+        payments: customerPayments.length,
+        expenses: expenses.length,
+        recipes: recipes.length,
+        productionRuns: productionRuns.length
+      }
+    });
+  } catch (err: any) {
+    console.error('[Backup Import Error]', err);
+    return res.status(500).json({ error: 'Failed to restore backup: ' + err.message });
   }
 });
 

@@ -15,9 +15,12 @@ import {
   Plus,
   Compass,
   X,
-  Database
+  Database,
+  Download,
+  Upload,
+  Cloud
 } from 'lucide-react';
-import { LorryService, RouteService, SettingsService } from '../services/api';
+import { LorryService, RouteService, SettingsService, BackupService } from '../services/api';
 import { Lorry, Route, SystemSettings } from '../types';
 import { useCurrency, CURRENCIES, CurrencyCode } from '../context/CurrencyContext';
 
@@ -42,6 +45,12 @@ export const Settings: React.FC = () => {
   const [savingSettings, setSavingSettings] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Backup & Cloud Migration State
+  const [exportingBackup, setExportingBackup] = useState(false);
+  const [importingBackup, setImportingBackup] = useState(false);
+  const [backupSuccess, setBackupSuccess] = useState<string | null>(null);
+  const [backupError, setBackupError] = useState<string | null>(null);
 
   // Edit Lorry Modal State
   const [editingLorry, setEditingLorry] = useState<Lorry | null>(null);
@@ -105,6 +114,49 @@ export const Settings: React.FC = () => {
       setRouteError(err?.response?.data?.error || err.message || 'Failed to create route.');
     } finally {
       setSavingRoute(false);
+    }
+  };
+
+  const handleExportBackup = async () => {
+    try {
+      setExportingBackup(true);
+      setBackupError(null);
+      const data = await BackupService.exportData();
+      const counts = data.counts || {};
+      setBackupSuccess(
+        `Backup downloaded! Snapshot contains: ${counts.orders || 0} orders, ${counts.products || 0} products, ${counts.customers || 0} customers.`
+      );
+      setTimeout(() => setBackupSuccess(null), 8000);
+    } catch (err: any) {
+      setBackupError('Failed to export backup: ' + (err.message || 'Unknown error'));
+    } finally {
+      setExportingBackup(false);
+    }
+  };
+
+  const handleImportFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setImportingBackup(true);
+      setBackupError(null);
+      const text = await file.text();
+      const json = JSON.parse(text);
+
+      const res = await BackupService.importData(json);
+      const counts = res.importedCounts || {};
+      setBackupSuccess(
+        `Cloud backup restored into local database! Ingested ${counts.orders || 0} orders, ${counts.products || 0} products, ${counts.customers || 0} customers, ${counts.lorries || 0} lorries.`
+      );
+      setTimeout(() => setBackupSuccess(null), 8000);
+      await loadData();
+    } catch (err: any) {
+      console.error('Import failed', err);
+      setBackupError('Failed to import backup: ' + (err.response?.data?.error || err.message || 'Invalid JSON file'));
+    } finally {
+      setImportingBackup(false);
+      if (e.target) e.target.value = '';
     }
   };
 
@@ -555,6 +607,88 @@ export const Settings: React.FC = () => {
           </div>
         </div>
       </form>
+
+      {/* SECTION: CLOUD BACKUP & OFFLINE DATA MIGRATION BRIDGE */}
+      <div className="bg-white border border-slate-200/80 rounded-3xl p-5 sm:p-7 shadow-2xs space-y-5">
+        <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <Cloud className="w-5 h-5 text-blue-600" />
+              Cloud Backup & Offline Data Migration
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Export live sales and inventory data from Railway PostgreSQL and restore it into your offline desktop software (.exe).
+            </p>
+          </div>
+          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 self-start sm:self-auto font-mono">
+            Zero-Loss Migration Bridge
+          </span>
+        </div>
+
+        {backupSuccess && (
+          <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-2.5 text-emerald-800 text-xs font-semibold animate-fadeIn">
+            <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{backupSuccess}</span>
+          </div>
+        )}
+
+        {backupError && (
+          <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-2.5 text-rose-800 text-xs font-semibold animate-fadeIn">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>{backupError}</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Export Card */}
+          <div className="p-5 rounded-2xl border border-slate-200 bg-slate-50/60 flex flex-col justify-between space-y-4">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <Download className="w-4 h-4 text-blue-600" />
+                <h3 className="font-bold text-sm text-slate-900">1. Download Cloud Backup</h3>
+              </div>
+              <p className="text-xs text-slate-500">
+                Exports all database records (Products, Customers, Bills, Lorry Loadings, Payments, Users, Expenses) into a portable JSON backup file.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleExportBackup}
+              disabled={exportingBackup}
+              className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-2 transition"
+            >
+              <Download className="w-4 h-4" />
+              <span>{exportingBackup ? 'Exporting Snapshot...' : 'Download Full Backup (.json)'}</span>
+            </button>
+          </div>
+
+          {/* Import Card */}
+          <div className="p-5 rounded-2xl border border-slate-200 bg-slate-50/60 flex flex-col justify-between space-y-4">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <Upload className="w-4 h-4 text-emerald-600" />
+                <h3 className="font-bold text-sm text-slate-900">2. Restore / Ingest into Offline Software</h3>
+              </div>
+              <p className="text-xs text-slate-500">
+                Upload your Railway backup JSON file to populate or synchronize your offline desktop SQLite database with zero data loss.
+              </p>
+            </div>
+
+            <label className="w-full py-2.5 px-4 bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold text-xs rounded-xl shadow-2xs flex items-center justify-center gap-2 cursor-pointer transition">
+              <Upload className="w-4 h-4 text-emerald-600" />
+              <span>{importingBackup ? 'Restoring Database...' : 'Select Backup File to Ingest'}</span>
+              <input
+                type="file"
+                accept=".json"
+                disabled={importingBackup}
+                onChange={handleImportFileChange}
+                className="hidden"
+              />
+            </label>
+          </div>
+        </div>
+      </div>
 
       {/* SECTION 4: OFFLINE DATABASE ENGINE STATUS */}
       <div className="bg-slate-50 border border-slate-200/80 rounded-3xl p-5 sm:p-6 text-xs text-slate-500 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
