@@ -14,6 +14,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Inventory } from './pages/Inventory';
 import { LorryLoading } from './pages/LorryLoading';
 import { BillEntry } from './pages/BillEntry';
+import { RepBilling } from './pages/RepBilling';
 import { LorrySettlement } from './pages/LorrySettlement';
 import { Customers } from './pages/Customers';
 import { Reports } from './pages/Reports';
@@ -119,6 +120,13 @@ export const AppContent: React.FC = () => {
 
           <div className={currentTab === 'bill-entry' ? '' : 'hidden'}>
             <BillEntry onViewInvoice={(order) => setActiveInvoiceOrder(order)} />
+          </div>
+
+          <div className={currentTab === 'rep-billing' ? '' : 'hidden'}>
+            <RepBilling
+              onViewInvoice={(order) => setActiveInvoiceOrder(order)}
+              onExitToMenu={() => setCurrentTab('dashboard')}
+            />
           </div>
 
           <div className={currentTab === 'lorry-settlement' ? '' : 'hidden'}>

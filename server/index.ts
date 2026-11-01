@@ -899,14 +899,18 @@ app.post('/api/lorries/:id/bills', async (req: Request, res: Response) => {
           );
         }
 
-        const lineTotal = product.unitPrice * qty;
+        const itemUnitPrice = item.unitPrice !== undefined && !isNaN(parseFloat(item.unitPrice)) && parseFloat(item.unitPrice) >= 0
+          ? parseFloat(item.unitPrice)
+          : product.unitPrice;
+
+        const lineTotal = itemUnitPrice * qty;
         subtotal += lineTotal;
 
         orderItemsToCreate.push({
           productId: product.id,
           quantity: qty,
           freeQuantity: freeQty,
-          unitPrice: product.unitPrice,
+          unitPrice: itemUnitPrice,
           lineTotal
         });
 
@@ -936,10 +940,21 @@ app.post('/api/lorries/:id/bills', async (req: Request, res: Response) => {
         }
       }
 
-      // Calculations
-      const discountPercentage = customer.discountPercentage || 0;
-      const discountAmount = (subtotal * discountPercentage) / 100;
-      const netTotal = subtotal - discountAmount;
+      // Calculations: allow custom discountAmount/discountPercentage or fall back to customer profile discount
+      const reqDiscountAmount = req.body.discountAmount !== undefined ? parseFloat(req.body.discountAmount) : null;
+      const reqDiscountPercent = req.body.discountPercentage !== undefined ? parseFloat(req.body.discountPercentage) : null;
+
+      let discountAmount = 0;
+      if (reqDiscountAmount !== null && !isNaN(reqDiscountAmount) && reqDiscountAmount >= 0) {
+        discountAmount = reqDiscountAmount;
+      } else if (reqDiscountPercent !== null && !isNaN(reqDiscountPercent) && reqDiscountPercent >= 0) {
+        discountAmount = (subtotal * reqDiscountPercent) / 100;
+      } else {
+        const discountPercentage = customer.discountPercentage || 0;
+        discountAmount = (subtotal * discountPercentage) / 100;
+      }
+
+      const netTotal = Math.max(0, subtotal - discountAmount);
 
       const paidAmount = parseFloat(cashReceived !== undefined ? cashReceived : (paymentMethod === 'CASH' ? netTotal : 0));
       const paymentStatus = paidAmount >= netTotal ? 'PAID' : (paidAmount > 0 ? 'PARTIAL' : 'UNPAID');
@@ -1754,7 +1769,11 @@ app.post('/api/orders', async (req: Request, res: Response) => {
           );
         }
 
-        const lineTotal = product.unitPrice * qty;
+        const itemUnitPrice = item.unitPrice !== undefined && !isNaN(parseFloat(item.unitPrice)) && parseFloat(item.unitPrice) >= 0
+          ? parseFloat(item.unitPrice)
+          : product.unitPrice;
+
+        const lineTotal = itemUnitPrice * qty;
         subtotal += lineTotal;
         totalBilledUnits += qty;
         totalFreeUnits += freeQty;
@@ -1763,7 +1782,7 @@ app.post('/api/orders', async (req: Request, res: Response) => {
           productId: product.id,
           quantity: qty,
           freeQuantity: freeQty,
-          unitPrice: product.unitPrice,
+          unitPrice: itemUnitPrice,
           lineTotal
         });
 
@@ -1778,9 +1797,20 @@ app.post('/api/orders', async (req: Request, res: Response) => {
         throw new Error('All bill item quantities are zero.');
       }
 
-      const discountPercentage = customer.discountPercentage || 0;
-      const discountAmount = (subtotal * discountPercentage) / 100;
-      const netTotal = subtotal - discountAmount;
+      const reqDiscountAmount = req.body.discountAmount !== undefined ? parseFloat(req.body.discountAmount) : null;
+      const reqDiscountPercent = req.body.discountPercentage !== undefined ? parseFloat(req.body.discountPercentage) : null;
+
+      let discountAmount = 0;
+      if (reqDiscountAmount !== null && !isNaN(reqDiscountAmount) && reqDiscountAmount >= 0) {
+        discountAmount = reqDiscountAmount;
+      } else if (reqDiscountPercent !== null && !isNaN(reqDiscountPercent) && reqDiscountPercent >= 0) {
+        discountAmount = (subtotal * reqDiscountPercent) / 100;
+      } else {
+        const discountPercentage = customer.discountPercentage || 0;
+        discountAmount = (subtotal * discountPercentage) / 100;
+      }
+
+      const netTotal = Math.max(0, subtotal - discountAmount);
 
       const paidAmount = parseFloat(cashReceived !== undefined && cashReceived !== '' ? cashReceived : (paymentMethod === 'CASH' ? netTotal : 0));
       const calculatedPaymentStatus = paymentStatus || (paidAmount >= netTotal ? 'PAID' : (paidAmount > 0 ? 'PARTIAL' : 'UNPAID'));

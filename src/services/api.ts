@@ -69,9 +69,11 @@ export const LorryService = {
   enterDriverBill: (id: string, payload: {
     paperBillNumber?: string;
     customerId: string;
-    items: { productId: string; quantity: number; freeQuantity?: number }[];
+    items: { productId: string; quantity: number; freeQuantity?: number; unitPrice?: number }[];
     paymentMethod: 'CASH' | 'CREDIT' | 'CHEQUE';
     cashReceived: number;
+    discountAmount?: number;
+    discountPercentage?: number;
     notes?: string;
     settlePreviousBills?: { orderId: string; amount: number; paymentMethod?: string }[];
   }) => api.post<Order>(`/lorries/${id}/bills`, payload).then(r => r.data),
@@ -122,10 +124,12 @@ export const OrderService = {
     walkInName?: string;
     walkInPhone?: string;
     paperBillNumber?: string;
-    items: { productId: string; quantity: number; freeQuantity?: number }[];
+    items: { productId: string; quantity: number; freeQuantity?: number; unitPrice?: number }[];
     paymentStatus?: string;
     paymentMethod?: string;
     cashReceived?: number;
+    discountAmount?: number;
+    discountPercentage?: number;
     notes?: string;
     lorryId?: string;
     settlePreviousBills?: { orderId: string; amount: number; paymentMethod?: string }[];
