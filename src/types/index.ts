@@ -532,3 +532,20 @@ export interface User {
   actualSalesThisMonth?: number;
   achievementPercentage?: number;
 }
+
+export interface RepTargetProgress {
+  dailyTarget: number;
+  monthlyTarget: number;
+  targetNewClients: number;
+  achievedToday: number;
+  achievedMonth: number;
+  todayBillsCount: number;
+  monthBillsCount: number;
+  dailyPercentage: number;
+  monthlyPercentage: number;
+  dailyRemaining: number;
+  monthlyRemaining: number;
+  repName?: string;
+  lorryVehicle?: string | null;
+  routeName?: string | null;
+}

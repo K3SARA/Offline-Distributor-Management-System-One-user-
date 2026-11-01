@@ -233,6 +233,84 @@ app.delete('/api/users/:id', async (req: Request, res: Response) => {
   }
 });
 
+// Live Target & Achieved Progress for Mobile Sales Rep
+app.get('/api/reps/my-targets', async (req: Request, res: Response) => {
+  try {
+    const { userId, lorryId } = req.query;
+
+    let targetUser: any = null;
+    if (userId && typeof userId === 'string') {
+      targetUser = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { lorry: { include: { route: true } } }
+      });
+    }
+
+    const effectiveLorryId = (lorryId as string) || targetUser?.lorryId || null;
+
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+
+    let achievedToday = 0;
+    let achievedMonth = 0;
+    let todayBillsCount = 0;
+    let monthBillsCount = 0;
+
+    if (effectiveLorryId) {
+      const todayAgg = await prisma.order.aggregate({
+        _sum: { netTotal: true },
+        _count: { id: true },
+        where: {
+          lorryId: effectiveLorryId,
+          createdAt: { gte: startOfDay }
+        }
+      });
+      achievedToday = todayAgg._sum.netTotal || 0;
+      todayBillsCount = todayAgg._count.id || 0;
+
+      const monthAgg = await prisma.order.aggregate({
+        _sum: { netTotal: true },
+        _count: { id: true },
+        where: {
+          lorryId: effectiveLorryId,
+          createdAt: { gte: startOfMonth }
+        }
+      });
+      achievedMonth = monthAgg._sum.netTotal || 0;
+      monthBillsCount = monthAgg._count.id || 0;
+    }
+
+    const dailyTarget = targetUser?.dailyTarget || 0;
+    const monthlyTarget = targetUser?.monthlyTarget || 0;
+    const targetNewClients = targetUser?.targetNewClients || 0;
+
+    const dailyPercentage = dailyTarget > 0 ? Math.round((achievedToday / dailyTarget) * 100) : 0;
+    const monthlyPercentage = monthlyTarget > 0 ? Math.round((achievedMonth / monthlyTarget) * 100) : 0;
+    const dailyRemaining = Math.max(0, dailyTarget - achievedToday);
+    const monthlyRemaining = Math.max(0, monthlyTarget - achievedMonth);
+
+    return res.json({
+      dailyTarget,
+      monthlyTarget,
+      targetNewClients,
+      achievedToday,
+      achievedMonth,
+      todayBillsCount,
+      monthBillsCount,
+      dailyPercentage,
+      monthlyPercentage,
+      dailyRemaining,
+      monthlyRemaining,
+      repName: targetUser?.fullName || 'Sales Rep',
+      lorryVehicle: targetUser?.lorry?.vehicleNumber || null,
+      routeName: targetUser?.lorry?.route?.name || null
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // ========================================================
 // 0.2 BACKUP & DATA MIGRATION ENGINE (CLOUD -> OFFLINE DESKTOP)
 // ========================================================

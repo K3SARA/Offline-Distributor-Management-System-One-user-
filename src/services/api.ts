@@ -19,7 +19,8 @@ import {
   ProductionRun,
   ManufacturingSummary,
   LorryPerformanceReport,
-  User
+  User,
+  RepTargetProgress
 } from '../types';
 
 // Dynamic API URL: uses relative '/api' on Railway / production web,
@@ -289,7 +290,9 @@ export const AuthService = {
   updateUser: (id: string, data: Partial<User> & { password?: string }) =>
     api.put<User>(`/users/${id}`, data).then(r => r.data),
   deleteUser: (id: string) =>
-    api.delete<{ success: boolean }>(`/users/${id}`).then(r => r.data)
+    api.delete<{ success: boolean }>(`/users/${id}`).then(r => r.data),
+  getMyTargets: (params: { userId?: string; lorryId?: string }) =>
+    api.get<RepTargetProgress>('/reps/my-targets', { params }).then(r => r.data)
 };
 
 export const BackupService = {
