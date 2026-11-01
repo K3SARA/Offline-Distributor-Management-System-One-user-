@@ -1048,6 +1048,11 @@ app.post('/api/products/:id/stock-adjust', async (req: Request, res: Response) =
 app.delete('/api/products/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const existing = await prisma.product.findUnique({ where: { id } });
+    if (!existing) {
+      return res.json({ message: 'Product already removed or does not exist.' });
+    }
+
     const orderItemsCount = await prisma.orderItem.count({ where: { productId: id } });
     if (orderItemsCount > 0) {
       return res.status(400).json({ error: 'Cannot delete product with existing order history.' });
@@ -1056,6 +1061,9 @@ app.delete('/api/products/:id', async (req: Request, res: Response) => {
     await prisma.product.delete({ where: { id } });
     res.json({ message: 'Product deleted successfully.' });
   } catch (error: any) {
+    if (error.code === 'P2025') {
+      return res.json({ message: 'Product already removed or does not exist.' });
+    }
     res.status(400).json({ error: error.message });
   }
 });
@@ -1207,14 +1215,28 @@ app.post('/api/suppliers/:id/payments', async (req: Request, res: Response) => {
 app.delete('/api/suppliers/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const existing = await prisma.supplier.findUnique({ where: { id } });
+    if (!existing) {
+      return res.json({ message: 'Supplier already removed or does not exist.' });
+    }
+
     const poCount = await prisma.purchaseOrder.count({ where: { supplierId: id } });
     if (poCount > 0) {
       return res.status(400).json({ error: 'Cannot delete supplier with linked purchase orders.' });
     }
 
+    // Unlink any products referencing this supplier before deletion
+    await prisma.product.updateMany({
+      where: { supplierId: id },
+      data: { supplierId: null }
+    });
+
     await prisma.supplier.delete({ where: { id } });
     res.json({ message: 'Supplier deleted successfully.' });
   } catch (error: any) {
+    if (error.code === 'P2025') {
+      return res.json({ message: 'Supplier already removed or does not exist.' });
+    }
     res.status(400).json({ error: error.message });
   }
 });
@@ -3904,11 +3926,18 @@ app.put('/api/expenses/:id', async (req: Request, res: Response) => {
 app.delete('/api/expenses/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const existing = await prisma.expense.findUnique({ where: { id } });
+    if (!existing) {
+      return res.json({ success: true, message: 'Expense already removed or does not exist.' });
+    }
     await prisma.expense.delete({
       where: { id }
     });
     res.json({ success: true, message: 'Expense record deleted.' });
   } catch (error: any) {
+    if (error.code === 'P2025') {
+      return res.json({ success: true, message: 'Expense already removed or does not exist.' });
+    }
     res.status(400).json({ error: error.message });
   }
 });
@@ -4058,9 +4087,16 @@ app.put('/api/manufacturing/recipes/:id', async (req: Request, res: Response) =>
 app.delete('/api/manufacturing/recipes/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const existing = await prisma.recipe.findUnique({ where: { id } });
+    if (!existing) {
+      return res.json({ success: true, message: 'Recipe already removed or does not exist.' });
+    }
     await prisma.recipe.delete({ where: { id } });
     res.json({ success: true, message: 'Recipe removed successfully.' });
   } catch (error: any) {
+    if (error.code === 'P2025') {
+      return res.json({ success: true, message: 'Recipe already removed or does not exist.' });
+    }
     res.status(400).json({ error: error.message });
   }
 });
